@@ -5,7 +5,7 @@ from pathlib import Path
 st.set_page_config(
     page_title="Accounts Receivable | Groundwork Finance Portal",
     page_icon="💰",
-    layout="wide"
+    layout="wide",
 )
 
 st.title("💰 Accounts Receivable Dashboard")
@@ -25,6 +25,7 @@ df["Age"] = pd.to_numeric(df["Age"], errors="coerce").fillna(0)
 df["Bucket"] = df["Bucket"].fillna("Unknown")
 df["Channel Clean"] = df["Channel Clean"].fillna("Unknown")
 df["Terms: Name"] = df["Terms: Name"].fillna("Unknown")
+df["Sales Rep: Name"] = df["Sales Rep: Name"].fillna("Unknown")
 
 bucket_order = ["Current", "1-14", "15-30", "31-60", "61-90", "91+"]
 
@@ -69,7 +70,7 @@ channel_table = pd.concat([channel_table, grand_total_row])
 
 st.dataframe(
     channel_table.style.format("${:,.0f}"),
-    use_container_width=True
+    use_container_width=True,
 )
 
 st.markdown("## Aging by Terms by Bucket")
@@ -97,7 +98,7 @@ terms_table = pd.concat([terms_table, grand_total_terms])
 
 st.dataframe(
     terms_table.style.format("${:,.0f}"),
-    use_container_width=True
+    use_container_width=True,
 )
 
 st.markdown("## Top 25 Past Due Customers")
@@ -120,8 +121,7 @@ top_customers = (
     .head(25)
 )
 
-st.dataframe(
-    top_customers = top_customers.rename(
+top_customers = top_customers.rename(
     columns={
         "Reporting Customer": "Customer",
         "Channel Clean": "Channel",
@@ -131,10 +131,18 @@ st.dataframe(
     }
 )
 
+top_customers = top_customers[
+    [
+        "Customer",
+        "Channel",
+        "Sales Rep",
+        "Terms",
+        "Past Due Balance",
+    ]
+]
+
 st.dataframe(
-    top_customers.style.format(
-        {"Past Due Balance": "${:,.0f}"}
-    ),
+    top_customers.style.format({"Past Due Balance": "${:,.0f}"}),
     use_container_width=True,
     hide_index=True,
 )
@@ -146,16 +154,26 @@ detail = df[
         "Reporting Customer",
         "Channel Clean",
         "Terms: Name",
+        "Sales Rep: Name",
         "Document Number",
         "Due Date",
         "Age",
         "Bucket",
         "Open Balance",
     ]
-]
+].rename(
+    columns={
+        "Reporting Customer": "Customer",
+        "Channel Clean": "Channel",
+        "Terms: Name": "Terms",
+        "Sales Rep: Name": "Sales Rep",
+        "Document Number": "Document Number",
+        "Open Balance": "Open Balance",
+    }
+)
 
 st.dataframe(
     detail.style.format({"Open Balance": "${:,.0f}"}),
     use_container_width=True,
-    hide_index=True
+    hide_index=True,
 )
