@@ -106,16 +106,37 @@ past_due_df = df[df["Age"] > 0]
 
 top_customers = (
     past_due_df
-    .groupby(["Reporting Customer", "Channel Clean"], as_index=False)["Open Balance"]
+    .groupby(
+        [
+            "Reporting Customer",
+            "Channel Clean",
+            "Sales Rep: Name",
+            "Terms: Name",
+        ],
+        as_index=False,
+    )["Open Balance"]
     .sum()
     .sort_values("Open Balance", ascending=False)
     .head(25)
 )
 
 st.dataframe(
-    top_customers.style.format({"Open Balance": "${:,.0f}"}),
+    top_customers = top_customers.rename(
+    columns={
+        "Reporting Customer": "Customer",
+        "Channel Clean": "Channel",
+        "Sales Rep: Name": "Sales Rep",
+        "Terms: Name": "Terms",
+        "Open Balance": "Past Due Balance",
+    }
+)
+
+st.dataframe(
+    top_customers.style.format(
+        {"Past Due Balance": "${:,.0f}"}
+    ),
     use_container_width=True,
-    hide_index=True
+    hide_index=True,
 )
 
 st.markdown("## Invoice Detail")
