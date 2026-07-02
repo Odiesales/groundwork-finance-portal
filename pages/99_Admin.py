@@ -22,7 +22,6 @@ uploaded_file = st.file_uploader(
 )
 
 if uploaded_file is not None:
-
     df = pd.read_excel(uploaded_file)
     df = clean_ar_data(df)
 
@@ -40,9 +39,9 @@ if uploaded_file is not None:
         st.metric("Total AR", f"${df['Open Balance'].sum():,.2f}")
 
     if st.button("Save Current AR Snapshot"):
-    st.session_state["current_ar_data"] = df
-    df.to_csv(EXPORT_PATH, index=False)
-    st.success("Current AR snapshot saved for this session. Go to Accounts Receivable dashboard.")
+        st.session_state["current_ar_data"] = df
+        df.to_csv(EXPORT_PATH, index=False)
+        st.success("Current AR snapshot saved for this session. Go to Accounts Receivable dashboard.")
 
     preview = df[
         [
