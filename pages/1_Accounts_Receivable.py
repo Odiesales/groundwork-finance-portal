@@ -27,6 +27,35 @@ df["Channel Clean"] = df["Channel Clean"].fillna("Unknown")
 df["Terms: Name"] = df["Terms: Name"].fillna("Unknown")
 df["Sales Rep: Name"] = df["Sales Rep: Name"].fillna("Unknown")
 
+st.sidebar.markdown("## Filters")
+
+customers = sorted(df["Reporting Customer"].dropna().unique())
+channels = sorted(df["Channel Clean"].dropna().unique())
+sales_reps = sorted(df["Sales Rep: Name"].dropna().unique())
+terms = sorted(df["Terms: Name"].dropna().unique())
+buckets = sorted(df["Bucket"].dropna().unique())
+
+selected_customers = st.sidebar.multiselect("Customer", customers)
+selected_channels = st.sidebar.multiselect("Channel", channels)
+selected_sales_reps = st.sidebar.multiselect("Sales Rep", sales_reps)
+selected_terms = st.sidebar.multiselect("Terms", terms)
+selected_buckets = st.sidebar.multiselect("Aging Bucket", buckets)
+
+if selected_customers:
+    df = df[df["Reporting Customer"].isin(selected_customers)]
+
+if selected_channels:
+    df = df[df["Channel Clean"].isin(selected_channels)]
+
+if selected_sales_reps:
+    df = df[df["Sales Rep: Name"].isin(selected_sales_reps)]
+
+if selected_terms:
+    df = df[df["Terms: Name"].isin(selected_terms)]
+
+if selected_buckets:
+    df = df[df["Bucket"].isin(selected_buckets)]
+    
 bucket_order = ["Current", "1-14", "15-30", "31-60", "61-90", "91+"]
 
 total_ar = df["Open Balance"].sum()
