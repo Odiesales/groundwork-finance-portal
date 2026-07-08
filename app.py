@@ -355,7 +355,7 @@ with tab_exec:
         aging_totals = aging_bucket_totals(filtered, amount_col)
         if not aging_totals.empty:
             fig = px.bar(aging_totals, x="Bucket", y="Amount", text_auto=".2s")
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, use_container_width=True, key="exec_aging_bucket")
         else:
             st.warning("Bucket column not available.")
 
@@ -370,7 +370,7 @@ with tab_exec:
         )
         fig = px.bar(top_customers, x=amount_col, y="Customer Display", orientation="h", text_auto=".2s")
         fig.update_layout(yaxis={"categoryorder": "total ascending"})
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, use_container_width=True, key="exec_top_customers")
 
 
 # -----------------------------
@@ -434,7 +434,7 @@ with tab_cb:
             )
             fig = px.bar(by_reason, x=amount_col, y="Transaction Reason", orientation="h", text_auto=".2s")
             fig.update_layout(yaxis={"categoryorder": "total ascending"})
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, use_container_width=True, key="chargeback_reason")
 
         with right:
             st.markdown("### By Customer")
@@ -447,7 +447,7 @@ with tab_cb:
             )
             fig = px.bar(by_customer, x=amount_col, y="Customer Display", orientation="h", text_auto=".2s")
             fig.update_layout(yaxis={"categoryorder": "total ascending"})
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, use_container_width=True, key="chargeback_customer")
 
         st.markdown("### Chargeback Detail")
         st.dataframe(cb, use_container_width=True, hide_index=True)
@@ -488,7 +488,7 @@ with tab_customer:
             customer_aging = aging_bucket_totals(customer_df, amount_col)
             if not customer_aging.empty:
                 fig = px.bar(customer_aging, x="Bucket", y="Amount", text_auto=".2s")
-                st.plotly_chart(fig, use_container_width=True)
+                st.plotly_chart(fig, use_container_width=True, key="customer_aging")
 
         with right:
             st.markdown("### Chargebacks by Reason")
@@ -503,7 +503,7 @@ with tab_customer:
                 )
                 fig = px.bar(reason_chart, x=amount_col, y="Transaction Reason", orientation="h", text_auto=".2s")
                 fig.update_layout(yaxis={"categoryorder": "total ascending"})
-                st.plotly_chart(fig, use_container_width=True)
+                st.plotly_chart(fig, use_container_width=True, key="customer_reason")
 
         st.markdown("### Customer Transactions")
         st.dataframe(customer_df, use_container_width=True, hide_index=True)
