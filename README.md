@@ -1,25 +1,35 @@
 # Groundwork Finance Portal
 
-Version 0.1.0
+Streamlit dashboard for Groundwork Coffee finance reporting.
+
+## Included pages
+- Executive Summary
+- Accounts Receivable
+- Revenue & Pricing
+- Trends
+- Admin
+
+## Weekly workflow
+1. Export AR Aging and/or Revenue from NetSuite.
+2. Open **Admin**.
+3. Upload the file.
+4. Select the snapshot / week-ending date.
+5. Click **Save Snapshot**.
+6. Review Executive, Revenue, AR, and Trends pages.
 
 ## Run locally
-
-```powershell
-cd C:\Projects\Groundwork-Finance-Portal
-Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
-.\.venv\Scripts\Activate.ps1
-python -m streamlit run app.py
+```bash
+streamlit run app.py
 ```
 
-## Current features
+## Deploy
+Push this folder to GitHub and connect the repo to Streamlit Cloud. The app entry point is:
 
-- Home page
-- Accounts Receivable placeholder
-- Trends placeholder
-- Admin upload page
+```text
+app.py
+```
 
-## Next version
-
-- Read AR Aging file
-- Preview data
-- Begin cleanup logic
+## Notes
+- Snapshot CSVs are stored in `data/snapshots/ar` and `data/snapshots/revenue`.
+- Current cleaned files are stored in `data/exports`.
+- Keep `.venv`, `__pycache__`, and old ZIP/backups out of Git.
