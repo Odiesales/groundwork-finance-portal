@@ -17,9 +17,9 @@ OVER_90_BUCKETS = ["91+"]
 # Local report components preserve the detailed AR workflow while the app shell stays shared.
 st.markdown("""<style>
 .section-card{background:#fff;border:1px solid #D8D1C5;border-radius:14px;padding:18px;margin:22px 0 0;box-shadow:0 7px 22px rgba(37,46,39,.04)}
-.section-title{font-size:1.12rem;font-weight:850;color:#22251F}.section-note{font-size:.86rem;color:#6F736A;margin:4px 0 14px}
+.section-title{font-size:1.12rem;font-weight:850;color:#0B4A3A}.section-note{font-size:.86rem;color:#6F736A;margin:4px 0 14px}
 .kpi-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}.kpi-card{background:#fff;border:1px solid #D8D1C5;border-left:4px solid #E6B92F;border-radius:11px;padding:14px 16px;min-height:92px}.kpi-label{color:#6F736A;font-size:.76rem;font-weight:760}.kpi-value{color:#22251F;font-size:1.42rem;font-weight:860;margin-top:5px;white-space:nowrap}
-.report-table-wrap{overflow:auto;border:1px solid #E3DDD2;border-radius:10px;background:#fff}table.report-table{border-collapse:collapse;width:100%;min-width:900px;font-size:.79rem;color:#22251F}table.report-table th{position:sticky;top:0;z-index:1;background:#EEE9DF;color:#22251F;font-weight:800;text-align:left;padding:9px 10px;border-bottom:1px solid #D8D1C5;white-space:nowrap}table.report-table td{background:#fff;color:#22251F;padding:8px 10px;border-bottom:1px solid #ECE7DF;white-space:nowrap}table.report-table tr:nth-child(even) td{background:#FCFAF7}table.report-table td.num,table.report-table th.num{text-align:right;font-variant-numeric:tabular-nums}.badge-red{color:#B42318;font-weight:800}.badge-green{color:#067647;font-weight:800}.badge-amber{color:#B54708;font-weight:800}.empty-box{background:#EDF7ED;color:#286B35;padding:12px 14px;border-radius:8px;font-weight:650}@media(max-width:900px){.kpi-grid{grid-template-columns:1fr}}
+.report-table-wrap{overflow:auto;border:1px solid #E3DDD2;border-radius:10px;background:#fff}table.report-table{border-collapse:collapse;width:100%;min-width:900px;font-size:.79rem;color:#22251F}table.report-table th{position:sticky;top:0;z-index:1;background:#EEE9DF;color:#22251F;font-weight:800;text-align:left;padding:9px 10px;border-bottom:1px solid #D8D1C5;white-space:nowrap}table.report-table td{background:#fff;color:#22251F;padding:8px 10px;border-bottom:1px solid #ECE7DF;white-space:nowrap}table.report-table tr:nth-child(even) td{background:#FCFAF7}table.report-table td.num,table.report-table th.num{text-align:right;font-variant-numeric:tabular-nums}.badge-red{color:#B42318;font-weight:800}.badge-green{color:#067647;font-weight:800}.badge-amber{color:#B54708;font-weight:800}.terms-heading{font-size:1.35rem;font-weight:850;color:#0B4A3A;margin:24px 0 10px}.terms-heading.credit-card{color:#D96B00}.empty-box{background:#EDF7ED;color:#286B35;padding:12px 14px;border-radius:8px;font-weight:650}@media(max-width:900px){.kpi-grid{grid-template-columns:1fr}}
 </style>""",unsafe_allow_html=True)
 
 def money(value):
@@ -81,46 +81,45 @@ def section_end():
 
 
 def render_table(df, money_cols=None, integer_cols=None, max_height=560):
+    """Render an interactive, sortable Streamlit table with finance formatting."""
     money_cols = set(money_cols or [])
     integer_cols = set(integer_cols or [])
     if df.empty:
         st.markdown('<div class="empty-box">No records found for the selected filters.</div>', unsafe_allow_html=True)
         return
-    headers = []
-    for col in df.columns:
-        cls = ' class="num"' if col in money_cols or col in integer_cols else ''
-        headers.append(f'<th{cls}>{html.escape(str(col))}</th>')
-    rows = []
-    for _, row in df.iterrows():
-        cells = []
-        for col in df.columns:
-            value = row[col]
-            cls = ' class="num"' if col in money_cols or col in integer_cols else ''
-            if col in money_cols:
-                text = money(value)
-            elif col in integer_cols:
-                try:
-                    text = f"{int(value):,}"
-                except Exception:
-                    text = "0"
-            else:
-                text = "—" if pd.isna(value) or str(value).strip() == "" else str(value)
-                if col == "Suggested Hold":
-                    css = "badge-red" if text == "Yes" else "badge-green"
-                    text = f'<span class="{css}">{html.escape(text)}</span>'
-                elif col == "Priority":
-                    css = "badge-red" if text == "High Priority" else ("badge-amber" if "Review" in text else "badge-green")
-                    text = f'<span class="{css}">{html.escape(text)}</span>'
-                else:
-                    text = html.escape(text)
-            cells.append(f'<td{cls}>{text}</td>')
-        rows.append('<tr>' + ''.join(cells) + '</tr>')
-    table_html = (
-        f'<div class="report-table-wrap" style="max-height:{max_height}px">'
-        '<table class="report-table"><thead><tr>' + ''.join(headers) +
-        '</tr></thead><tbody>' + ''.join(rows) + '</tbody></table></div>'
+
+    display = df.copy()
+    column_config = {}
+    for col in display.columns:
+        if col in money_cols:
+            display[col] = pd.to_numeric(display[col], errors="coerce").fillna(0.0)
+            column_config[col] = st.column_config.NumberColumn(col, format="$%.2f")
+        elif col in integer_cols:
+            display[col] = pd.to_numeric(display[col], errors="coerce").fillna(0).astype(int)
+            column_config[col] = st.column_config.NumberColumn(col, format="%d")
+
+    def highlight_status(value):
+        text = str(value)
+        if text in {"Yes", "High Priority"}:
+            return "color:#B42318;font-weight:800"
+        if text == "No" or text == "Monitor":
+            return "color:#067647;font-weight:800"
+        if "Review" in text:
+            return "color:#B54708;font-weight:800"
+        return ""
+
+    styler = display.style
+    for col in ["Suggested Hold", "Priority"]:
+        if col in display.columns:
+            styler = styler.map(highlight_status, subset=[col])
+
+    st.dataframe(
+        styler,
+        use_container_width=True,
+        hide_index=True,
+        height=min(max_height, max(120, 38 * (len(display) + 1))),
+        column_config=column_config,
     )
-    st.markdown(table_html, unsafe_allow_html=True)
 
 
 options = snapshot_options()
@@ -260,15 +259,16 @@ section_end()
 section_start("2. Terms Priority", "Accounts requiring attention based on 5th MFI, 10th MFI, or credit-card terms.")
 
 def terms_queue(title, pattern, regex=False):
-    st.markdown(f"### {title}")
+    heading_class = "terms-heading credit-card" if title == "Credit Card Accounts" else "terms-heading"
+    st.markdown(f'<div class="{heading_class}">{html.escape(title)}</div>', unsafe_allow_html=True)
     mask = customer_summary["Terms"].fillna("").str.contains(pattern, case=False, na=False, regex=regex)
     table = customer_summary[mask & (customer_summary["Total AR"] != 0)].sort_values(["Past Due", "Total AR"], ascending=False)
     table = table[["Customer", "Next Due Date", "Total AR", "Past Due", "Oldest Invoice Days", "Sales Rep", "Priority"]].head(50)
     render_table(table, money_cols=["Total AR", "Past Due"], integer_cols=["Oldest Invoice Days"], max_height=430)
 
-terms_queue("5th MFI", "5th MFI")
-terms_queue("10th MFI", "10th MFI")
-terms_queue("Credit Card", r"\bCC\b|Credit Card", regex=True)
+terms_queue("5th MFI Auto-Debit", "5th MFI")
+terms_queue("10th MFI Auto-Debit", "10th MFI")
+terms_queue("Credit Card Accounts", r"\bCC\b|Credit Card", regex=True)
 section_end()
 
 hold_table = customer_summary[customer_summary["60+"] > 0].sort_values(["60+", "90+"], ascending=False)
