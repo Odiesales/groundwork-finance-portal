@@ -36,8 +36,14 @@ def inject_global_css() -> None:
 :root{{--gw-cream:{CREAM};--gw-card:{CARD};--gw-charcoal:{CHARCOAL};--gw-muted:{MUTED};--gw-yellow:{YELLOW};--gw-border:{BORDER};--gw-green:{GREEN};--gw-green2:{GREEN_2};--gw-red:{RED};}}
 html,body,[class*="css"]{{color:var(--gw-charcoal)}}
 .stApp,[data-testid="stAppViewContainer"],[data-testid="stMain"]{{background:var(--gw-cream)!important}}
-[data-testid="stHeader"]{{background:#11151D!important;height:3.25rem}}
-.block-container{{max-width:1500px;padding:1.05rem 2.1rem 3rem}}
+/* Remove Streamlit's black application chrome */
+[data-testid="stHeader"],
+[data-testid="stToolbar"],
+[data-testid="stDecoration"],
+#MainMenu,
+footer{{display:none!important;visibility:hidden!important;height:0!important}}
+[data-testid="stAppViewContainer"] > .main{{top:0!important}}
+.block-container{{max-width:1500px;padding:.35rem 2.1rem 3rem}}
 
 /* One shared sidebar shell */
 [data-testid="stSidebar"]{{background:var(--gw-green)!important;border-right:0!important}}
@@ -65,9 +71,9 @@ html,body,[class*="css"]{{color:var(--gw-charcoal)}}
 div[data-baseweb="popover"],div[data-baseweb="menu"],ul[role="listbox"],li[role="option"],div[role="option"]{{background:#fff!important;color:#22251F!important}}
 
 /* Shared banner */
-.gw-page-head{{display:flex;justify-content:space-between;align-items:center;gap:1.4rem;background:#fff;border:1px solid var(--gw-border);border-radius:18px;padding:1.15rem 1.45rem;margin:.1rem 0 1.35rem;box-shadow:0 9px 26px rgba(37,46,39,.06)}}
+.gw-page-head{{display:flex;justify-content:space-between;align-items:center;gap:1.4rem;background:#fff;border:1px solid var(--gw-border);border-radius:18px;padding:1rem 1.45rem;margin:0 0 1.35rem;box-shadow:0 9px 26px rgba(37,46,39,.06)}}
 .gw-greeting{{color:var(--gw-green2);font-size:.92rem;font-weight:850;margin-bottom:.28rem}}
-.gw-page-title{{margin:0;color:var(--gw-green);font-size:2.85rem;line-height:1.03;font-weight:900;letter-spacing:-.04em}}
+.gw-page-head h1.gw-page-title{{margin:0!important;color:#143E33!important;-webkit-text-fill-color:#143E33!important;font-size:2.85rem!important;line-height:1.03!important;font-weight:900!important;letter-spacing:-.04em!important;opacity:1!important;text-shadow:none!important}}
 .gw-page-subtitle{{color:#50564E;font-size:1.08rem;line-height:1.45;margin-top:.48rem;font-weight:520}}
 .gw-head-status{{min-width:195px;background:var(--gw-green-pale);border:1px solid #CAD9D0;border-radius:12px;padding:.82rem 1rem;text-align:right;color:var(--gw-green)}}
 .gw-head-status strong{{color:var(--gw-green);font-size:.92rem}} .gw-head-status small{{display:block;color:#50564E;font-size:.82rem;margin-top:.18rem}}
