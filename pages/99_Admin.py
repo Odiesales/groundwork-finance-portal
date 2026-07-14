@@ -3,15 +3,14 @@ import pandas as pd
 from datetime import date
 from utils.cleaner import clean_uploaded_ar_report, clean_uploaded_revenue_report, convert_df_to_excel
 from utils.paths import CURRENT_AR_PATH, CURRENT_REVENUE_PATH, AR_SNAPSHOT_DIR, REVENUE_SNAPSHOT_DIR
-from utils.ui import format_money
+from utils.ui import format_money, page_header, section, footer
 
 st.set_page_config(page_title='Admin', page_icon='⚙️', layout='wide')
-st.title('⚙️ Admin')
-st.caption('Upload weekly NetSuite exports and save snapshots for historical reporting.')
+page_header('Administration', 'Upload weekly NetSuite exports, validate cleaned data, and save dated snapshots for historical reporting.', badge='Data Ops')
 
 snapshot_date = st.date_input('Snapshot / Week Ending Date', value=date.today())
 
-st.divider()
+section('Upload Center', 'Choose the week-ending date first, then upload the AR and/or Revenue export.')
 left, right = st.columns(2)
 
 with left:
@@ -63,9 +62,11 @@ with right:
             st.error(f'Could not process Revenue file: {exc}')
 
 st.divider()
-st.subheader('Saved Snapshots')
+section('Saved Snapshots')
 a = pd.DataFrame({'AR Snapshots': [p.name for p in sorted(AR_SNAPSHOT_DIR.glob('ar_*.csv'), reverse=True)]})
 r = pd.DataFrame({'Revenue Snapshots': [p.name for p in sorted(REVENUE_SNAPSHOT_DIR.glob('revenue_*.csv'), reverse=True)]})
 c1, c2 = st.columns(2)
 c1.dataframe(a, use_container_width=True, hide_index=True)
 c2.dataframe(r, use_container_width=True, hide_index=True)
+
+footer()
