@@ -26,6 +26,54 @@ page_header(
 )
 
 
+# CEO-ready page polish: light chart cards, readable tabs, and spacing that
+# prevents titles, legends, and labels from overlapping.
+st.markdown(
+    """
+    <style>
+    .block-container {padding-top: 1.15rem; padding-bottom: 2rem; max-width: 1500px;}
+    div[data-testid="stVerticalBlockBorderWrapper"] {
+        background: #ffffff;
+        border: 1px solid #dfe7e2 !important;
+        border-radius: 14px;
+        box-shadow: 0 3px 12px rgba(20, 73, 58, 0.06);
+    }
+    button[data-baseweb="tab"] {
+        background: #f4f7f5 !important;
+        border: 1px solid #d8e2dc !important;
+        border-radius: 8px 8px 0 0 !important;
+        padding: 0.65rem 1rem !important;
+        margin-right: 0.35rem !important;
+    }
+    button[data-baseweb="tab"] p {
+        color: #163f35 !important;
+        font-size: 0.94rem !important;
+        font-weight: 700 !important;
+        opacity: 1 !important;
+    }
+    button[data-baseweb="tab"][aria-selected="true"] {
+        background: #0f4b3c !important;
+        border-color: #0f4b3c !important;
+    }
+    button[data-baseweb="tab"][aria-selected="true"] p {color: #ffffff !important;}
+    div[data-testid="stPlotlyChart"] {
+        background: #ffffff;
+        border: 1px solid #e1e8e4;
+        border-radius: 12px;
+        padding: 0.4rem 0.5rem 0.2rem;
+        box-shadow: 0 2px 8px rgba(20, 73, 58, 0.05);
+    }
+    div[data-testid="stDataFrame"] {
+        border: 1px solid #e1e8e4;
+        border-radius: 10px;
+        overflow: hidden;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+
+
 def safe_numeric(frame: pd.DataFrame, column: str) -> pd.Series:
     if column not in frame.columns:
         return pd.Series(0.0, index=frame.index, dtype="float64")
@@ -96,105 +144,108 @@ def weekly_summary(frame: pd.DataFrame) -> pd.DataFrame:
     return grouped
 
 
-def combo_chart(summary: pd.DataFrame, title: str) -> go.Figure:
+def _base_layout(height: int = 410) -> dict:
+    return dict(
+        template="plotly_white",
+        paper_bgcolor="#ffffff",
+        plot_bgcolor="#ffffff",
+        font=dict(family="Arial, sans-serif", color="#173f35", size=12),
+        hovermode="x unified",
+        margin=dict(l=62, r=72, t=78, b=78),
+        height=height,
+        legend=dict(
+            orientation="h",
+            yanchor="bottom",
+            y=1.08,
+            xanchor="left",
+            x=0,
+            font=dict(size=11, color="#173f35"),
+            bgcolor="rgba(255,255,255,0.85)",
+        ),
+        xaxis=dict(
+            title=None,
+            tickangle=0,
+            tickfont=dict(size=10, color="#36564d"),
+            showgrid=False,
+            automargin=True,
+        ),
+    )
+
+
+def combo_chart(summary: pd.DataFrame, title: str = "") -> go.Figure:
     fig = go.Figure()
     fig.add_bar(
-        x=summary["Week Label"],
-        y=summary["Revenue"],
-        name="Revenue",
+        x=summary["Week Label"], y=summary["Revenue"], name="Revenue",
+        marker_color="#155b49",
         hovertemplate="%{x}<br>Revenue: $%{y:,.2f}<extra></extra>",
     )
-    fig.add_trace(
-        go.Scatter(
-            x=summary["Week Label"],
-            y=summary["Lbs"],
-            name="Lbs",
-            mode="lines+markers",
-            yaxis="y2",
-            hovertemplate="%{x}<br>Lbs: %{y:,.1f}<extra></extra>",
-        )
-    )
-    fig.add_trace(
-        go.Scatter(
-            x=summary["Week Label"],
-            y=summary["Weighted $/LB"],
-            name="Weighted $/LB",
-            mode="lines+markers",
-            yaxis="y3",
-            hovertemplate="%{x}<br>Weighted $/LB: $%{y:,.2f}<extra></extra>",
-        )
-    )
-    fig.update_layout(
-        title=title,
+    fig.add_trace(go.Scatter(
+        x=summary["Week Label"], y=summary["Lbs"], name="Eligible Lbs",
+        mode="lines+markers", yaxis="y2",
+        line=dict(color="#d7a928", width=2.4), marker=dict(size=6),
+        hovertemplate="%{x}<br>Eligible Lbs: %{y:,.1f}<extra></extra>",
+    ))
+    fig.add_trace(go.Scatter(
+        x=summary["Week Label"], y=summary["Weighted $/LB"], name="Weighted $/LB",
+        mode="lines+markers", yaxis="y3",
+        line=dict(color="#2f7dbd", width=2.4), marker=dict(size=6),
+        hovertemplate="%{x}<br>Weighted $/LB: $%{y:,.2f}<extra></extra>",
+    ))
+    layout = _base_layout(420)
+    layout.update(
+        title=dict(text=title, x=0.01, xanchor="left", font=dict(size=14)) if title else None,
         barmode="group",
-        hovermode="x unified",
-        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0),
-        margin=dict(l=10, r=70, t=75, b=10),
-        xaxis=dict(title=None),
-        yaxis=dict(title="Revenue", tickprefix="$", tickformat=",.0f", gridcolor="rgba(0,0,0,.08)"),
-        yaxis2=dict(title="Lbs", overlaying="y", side="right", showgrid=False, position=0.92),
-        yaxis3=dict(title="$/LB", overlaying="y", side="right", showgrid=False, anchor="free", position=1.0, tickprefix="$"),
-        height=430,
+        yaxis=dict(title="Revenue", tickprefix="$", tickformat="~s", gridcolor="#e8eeea", zeroline=False),
+        yaxis2=dict(title="Eligible Lbs", overlaying="y", side="right", showgrid=False, position=0.92, tickformat="~s"),
+        yaxis3=dict(title="$/LB", overlaying="y", side="right", showgrid=False, anchor="free", position=1.0, tickprefix="$", tickformat=".2f"),
     )
+    fig.update_layout(**layout)
     return fig
 
 
 def revenue_trend_chart(summary: pd.DataFrame) -> go.Figure:
     fig = go.Figure()
     fig.add_bar(
-        x=summary["Week Label"],
-        y=summary["Revenue"],
-        name="Revenue",
-        text=summary["Revenue"],
-        texttemplate="$%{text:,.0f}",
-        textposition="outside",
-        cliponaxis=False,
+        x=summary["Week Label"], y=summary["Revenue"], name="Revenue",
+        marker_color="#155b49", text=summary["Revenue"],
+        texttemplate="$%{text:,.0f}", textposition="outside", cliponaxis=False,
+        textfont=dict(size=10, color="#173f35"),
         hovertemplate="%{x}<br>Revenue: $%{y:,.2f}<extra></extra>",
     )
     if len(summary) >= 2:
         average = summary["Revenue"].mean()
-        fig.add_hline(
-            y=average,
-            line_dash="dot",
-            annotation_text=f"Period avg ${average:,.0f}",
-            annotation_position="top left",
-        )
-    fig.update_layout(
-        hovermode="x unified",
+        fig.add_hline(y=average, line_dash="dot", line_color="#d7a928",
+                      annotation_text=f"Average ${average:,.0f}",
+                      annotation_position="top left",
+                      annotation_font_color="#6b5715")
+    layout = _base_layout(420)
+    layout.update(
         showlegend=False,
-        margin=dict(l=10, r=10, t=35, b=10),
-        yaxis=dict(title="Revenue", tickprefix="$", tickformat=",.0f", gridcolor="rgba(0,0,0,.08)"),
-        xaxis=dict(title=None),
-        height=390,
+        margin=dict(l=62, r=28, t=55, b=78),
+        yaxis=dict(title="Revenue", tickprefix="$", tickformat="~s", gridcolor="#e8eeea", zeroline=False),
     )
+    fig.update_layout(**layout)
     return fig
 
 
 def line_chart(pivot: pd.DataFrame, title: str, y_title: str, currency: bool = True) -> go.Figure:
     fig = go.Figure()
-    for column in pivot.columns:
-        fig.add_trace(
-            go.Scatter(
-                x=pivot.index,
-                y=pivot[column],
-                name=str(column),
-                mode="lines+markers",
-            )
-        )
-    fig.update_layout(
-        title=title,
-        hovermode="x unified",
-        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0),
-        margin=dict(l=10, r=10, t=75, b=10),
-        yaxis=dict(
-            title=y_title,
-            tickprefix="$" if currency else "",
-            tickformat=",.2f" if currency else ",.0f",
-            gridcolor="rgba(0,0,0,.08)",
-        ),
-        xaxis=dict(title=None),
-        height=430,
+    palette = ["#155b49", "#2f7dbd", "#d7a928", "#9b5f93", "#d05b47", "#4f8b5b"]
+    for idx, column in enumerate(pivot.columns):
+        fig.add_trace(go.Scatter(
+            x=pivot.index, y=pivot[column], name=str(column), mode="lines+markers",
+            line=dict(width=2.2, color=palette[idx % len(palette)]), marker=dict(size=5),
+        ))
+    layout = _base_layout(430)
+    layout.update(
+        title=dict(text=title, x=0.01, xanchor="left", font=dict(size=14)),
+        margin=dict(l=62, r=28, t=105, b=72),
+        legend=dict(orientation="h", yanchor="bottom", y=1.14, xanchor="left", x=0,
+                    font=dict(size=10, color="#173f35"), bgcolor="rgba(255,255,255,0.9)"),
+        yaxis=dict(title=y_title, tickprefix="$" if currency else "",
+                   tickformat="~s" if currency else "~s", gridcolor="#e8eeea", zeroline=False),
     )
+    fig.update_layout(**layout)
     return fig
 
 
@@ -427,7 +478,7 @@ section(
     "Sales: Roasted Coffee, Lbs and $/LB",
     "Revenue is shown for all filtered transactions. Lbs and weighted $/LB exclude Retail and rows without positive pounds.",
 )
-st.plotly_chart(combo_chart(weekly, "Weekly Revenue, Eligible Pounds, and Weighted $/LB"), use_container_width=True)
+st.plotly_chart(combo_chart(weekly, ""), use_container_width=True)
 
 # -----------------------------------------------------------------------------
 # Channel-specific weekly analysis
@@ -449,7 +500,7 @@ for tab, channel_name in zip(channel_tabs, ["Grocery", "Foodservice", "E-Commerc
                 st.caption("Retail is revenue-only and is intentionally excluded from pounds and $/LB.")
             else:
                 st.plotly_chart(
-                    combo_chart(channel_weekly, f"{channel_name}: Revenue, Lbs, and Weighted $/LB"),
+                    combo_chart(channel_weekly, ""),
                     use_container_width=True,
                 )
 
@@ -468,7 +519,7 @@ if not retail_trend.empty:
     retail_pivot = retail_pivot.loc[:, top_locations]
     section("Retail: By Location", "Weekly revenue for the leading retail locations.")
     st.plotly_chart(
-        line_chart(retail_pivot, "Retail Revenue by Location", "Revenue", currency=True),
+        line_chart(retail_pivot, "Top Retail Locations — Weekly Revenue", "Revenue", currency=True),
         use_container_width=True,
     )
 
@@ -479,20 +530,18 @@ rep_source = trend_df[
     ~trend_df["Sales Rep"].str.contains("house account|unassigned", case=False, regex=True, na=False)
 ].copy()
 if not rep_source.empty:
-    rep_totals = rep_source.groupby("Sales Rep")["Revenue"].sum().nlargest(8).index
+    rep_totals = rep_source.groupby("Sales Rep")["Revenue"].sum().nlargest(5).index
     rep_revenue = (
         rep_source[rep_source["Sales Rep"].isin(rep_totals)]
         .groupby(["Week Start", "Sales Rep"])["Revenue"]
         .sum()
         .unstack(fill_value=0)
     )
-    left, right = st.columns(2)
-    with left:
-        section("Sales by Sales Representative", "Weekly revenue trends for the leading sales representatives.")
-        st.plotly_chart(
-            line_chart(rep_revenue, "Weekly Revenue by Sales Representative", "Revenue", currency=True),
-            use_container_width=True,
-        )
+    section("Sales by Sales Representative", "Weekly revenue trends for the top five sales representatives.")
+    st.plotly_chart(
+        line_chart(rep_revenue, "Top 5 Sales Representatives — Weekly Revenue", "Revenue", currency=True),
+        use_container_width=True,
+    )
 
     rep_lb_source = rep_source[rep_source["Eligible Lbs"] > 0].copy()
     if not rep_lb_source.empty:
@@ -506,12 +555,11 @@ if not rep_source.empty:
         ).fillna(0.0)
         rep_lb = rep_lb[rep_lb["Sales Rep"].isin(rep_totals)]
         rep_lb_pivot = rep_lb.pivot(index="Week Start", columns="Sales Rep", values="Weighted $/LB").fillna(0)
-        with right:
-            section("$/LB by Sales Representative", "Weighted weekly pricing using only eligible non-retail pounds.")
-            st.plotly_chart(
-                line_chart(rep_lb_pivot, "Weighted $/LB by Sales Representative", "Weighted $/LB", currency=True),
-                use_container_width=True,
-            )
+        section("$/LB by Sales Representative", "Weighted weekly pricing for the top five representatives using eligible non-retail pounds.")
+        st.plotly_chart(
+            line_chart(rep_lb_pivot, "Top 5 Sales Representatives — Weighted $/LB", "Weighted $/LB", currency=True),
+            use_container_width=True,
+        )
 
 # -----------------------------------------------------------------------------
 # Selected-week tables
