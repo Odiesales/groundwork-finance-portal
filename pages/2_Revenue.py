@@ -80,7 +80,7 @@ def weekly_summary(frame: pd.DataFrame) -> pd.DataFrame:
         return pd.DataFrame()
 
     grouped = (
-        frame.groupby("Week Ending", as_index=False)
+        frame.groupby("Week Start", as_index=False)
         .agg(
             Revenue=("Revenue", "sum"),
             Lbs=("Eligible Lbs", "sum"),
@@ -88,7 +88,7 @@ def weekly_summary(frame: pd.DataFrame) -> pd.DataFrame:
             Orders=("Document Number", "nunique"),
             Customers=("Customer", "nunique"),
         )
-        .sort_values("Week Ending")
+        .sort_values("Week Start")
     )
     grouped["Weighted $/LB"] = grouped["Eligible_Revenue"].div(
         grouped["Lbs"].replace(0, pd.NA)
@@ -256,15 +256,8 @@ for required_column, default in [
     if required_column not in df.columns:
         df[required_column] = default
 
-if "Trend Date" not in df.columns:
-    st.error("Revenue data does not contain a usable Trend Date column.")
-    footer()
-    st.stop()
-
-df["Trend Date"] = pd.to_datetime(df["Trend Date"], errors="coerce")
-df = df[df["Trend Date"].notna()].copy()
-if df.empty:
-    st.error("No valid transaction dates were found in the loaded Revenue data.")
+if "Week" not in df.columns:
+    st.error("Revenue data does not contain the source Week column (Column B).")
     footer()
     st.stop()
 
@@ -279,9 +272,43 @@ df["Item / Memo"] = safe_text(df, "Item / Memo")
 df["Document Number"] = safe_text(df, "Document Number")
 df["Channel Group"] = df["Sales Channel"].map(channel_group)
 
-# Week ending Sunday. Monday through Sunday all roll into the same reporting week.
-days_to_sunday = (6 - df["Trend Date"].dt.weekday) % 7
-df["Week Ending"] = (df["Trend Date"] + pd.to_timedelta(days_to_sunday, unit="D")).dt.normalize()
+# Column B (Week) is the reporting calendar source of truth.
+# Examples: "(26-Jun) 26", "(26-Jun) 27", "(26-Jul) 28".
+# The number is the reporting week and the two-digit prefix is the year.
+def parse_source_week(value):
+    import re
+
+    text = str(value).strip()
+    match = re.search(r"\((\d{2})-[A-Za-z]{3}\)\s*(\d{1,2})$", text)
+    if not match:
+        return pd.NaT, pd.NA
+
+    year = 2000 + int(match.group(1))
+    week_number = int(match.group(2))
+    try:
+        # Finance weeks run Sunday through Saturday. ISO week N begins Monday,
+        # so subtract one day to obtain the Sunday that opens reporting week N.
+        week_start = (pd.Timestamp.fromisocalendar(year, week_number, 1) - pd.Timedelta(days=1)).normalize()
+        return week_start, week_number
+    except ValueError:
+        return pd.NaT, pd.NA
+
+parsed_week = df["Week"].map(parse_source_week)
+df["Week Start"] = parsed_week.map(lambda item: item[0])
+df["Week Number"] = parsed_week.map(lambda item: item[1]).astype("Int64")
+df["Week Raw"] = safe_text(df, "Week")
+
+invalid_week_rows = int(df["Week Start"].isna().sum())
+if invalid_week_rows:
+    st.warning(
+        f"{invalid_week_rows:,} row(s) have an invalid or blank Week value in Column B and were excluded."
+    )
+
+df = df[df["Week Start"].notna()].copy()
+if df.empty:
+    st.error("No valid reporting weeks were found in Column B (Week).")
+    footer()
+    st.stop()
 
 # Retail is intentionally excluded from pounds and $/LB. Revenue is only included
 # in the $/LB numerator where an eligible, non-retail row carries positive pounds.
@@ -298,13 +325,13 @@ df["Eligible Revenue"] = df["Revenue"].where(eligible_lb_mask, 0.0)
 # -----------------------------------------------------------------------------
 st.sidebar.markdown("## Revenue Filters")
 
-available_weeks = sorted(df["Week Ending"].dropna().unique(), reverse=True)
+available_weeks = sorted(df["Week Start"].dropna().unique(), reverse=True)
 week_options = [pd.Timestamp(value) for value in available_weeks]
 selected_week = st.sidebar.selectbox(
-    "Week Ending",
+    "Week Of",
     options=week_options,
     index=0,
-    format_func=lambda value: f"{value:%b %d, %Y}  •  Week {value.isocalendar().week}",
+    format_func=lambda value: f"{value:%b %d} – {(value + pd.Timedelta(days=6)):%b %d, %Y}  •  Week {(value + pd.Timedelta(days=6)).isocalendar().week}",
 )
 
 history_weeks = st.sidebar.slider("Trend Weeks", min_value=4, max_value=26, value=16, step=1)
@@ -329,12 +356,12 @@ if search:
 
 history_start = selected_week - timedelta(weeks=history_weeks - 1)
 trend_df = filtered[
-    (filtered["Week Ending"] >= history_start)
-    & (filtered["Week Ending"] <= selected_week)
+    (filtered["Week Start"] >= history_start)
+    & (filtered["Week Start"] <= selected_week)
 ].copy()
-selected_df = filtered[filtered["Week Ending"] == selected_week].copy()
+selected_df = filtered[filtered["Week Start"] == selected_week].copy()
 prior_week = selected_week - timedelta(weeks=1)
-prior_df = filtered[filtered["Week Ending"] == prior_week].copy()
+prior_df = filtered[filtered["Week Start"] == prior_week].copy()
 
 if selected_df.empty:
     st.warning("No transactions match the selected week and filters.")
@@ -342,16 +369,16 @@ if selected_df.empty:
     st.stop()
 
 weekly = weekly_summary(trend_df)
-weekly["Week Label"] = weekly["Week Ending"].apply(
-    lambda value: f"W{value.isocalendar().week} • {value:%b %d}"
+weekly["Week Label"] = weekly["Week Start"].apply(
+    lambda value: f"W{int((value + pd.Timedelta(days=1)).isocalendar().week)} • {value:%b %d}"
 )
 
-current_row = weekly.loc[weekly["Week Ending"] == selected_week].iloc[0]
-prior_rows = weekly.loc[weekly["Week Ending"] == prior_week]
+current_row = weekly.loc[weekly["Week Start"] == selected_week].iloc[0]
+prior_rows = weekly.loc[weekly["Week Start"] == prior_week]
 prior_row = prior_rows.iloc[0] if not prior_rows.empty else None
 prior_four = weekly[
-    (weekly["Week Ending"] < selected_week)
-    & (weekly["Week Ending"] >= selected_week - timedelta(weeks=4))
+    (weekly["Week Start"] < selected_week)
+    & (weekly["Week Start"] >= selected_week - timedelta(weeks=4))
 ]
 
 current_revenue = float(current_row["Revenue"])
@@ -370,8 +397,8 @@ prior_four_revenue = float(prior_four["Revenue"].mean()) if not prior_four.empty
 # Weekly executive summary
 # -----------------------------------------------------------------------------
 section(
-    f"Week {selected_week.isocalendar().week} Executive Summary",
-    f"Reporting week ending {selected_week:%B %d, %Y}. Retail revenue is excluded from pounds and weighted $/LB.",
+    f"Week {int((selected_week + pd.Timedelta(days=1)).isocalendar().week)} Executive Summary",
+    f"Week of {selected_week:%B %d} through {(selected_week + pd.Timedelta(days=6)):%B %d, %Y}. Retail revenue is excluded from pounds and weighted $/LB.",
 )
 metric_row(
     [
@@ -414,8 +441,8 @@ for tab, channel_name in zip(channel_tabs, ["Grocery", "Foodservice", "E-Commerc
         if channel_weekly.empty:
             st.info(f"No {channel_name} transactions match the current filters.")
         else:
-            channel_weekly["Week Label"] = channel_weekly["Week Ending"].apply(
-                lambda value: f"W{value.isocalendar().week} • {value:%b %d}"
+            channel_weekly["Week Label"] = channel_weekly["Week Start"].apply(
+                lambda value: f"W{int((value + pd.Timedelta(days=1)).isocalendar().week)} • {value:%b %d}"
             )
             if channel_name == "Retail":
                 st.plotly_chart(revenue_trend_chart(channel_weekly), use_container_width=True)
@@ -433,7 +460,7 @@ retail_trend = trend_df[trend_df["Channel Group"] == "Retail"].copy()
 if not retail_trend.empty:
     location_column = "Location" if "Location" in retail_trend.columns else "Customer"
     retail_pivot = (
-        retail_trend.groupby(["Week Ending", location_column])["Revenue"]
+        retail_trend.groupby(["Week Start", location_column])["Revenue"]
         .sum()
         .unstack(fill_value=0)
     )
@@ -455,7 +482,7 @@ if not rep_source.empty:
     rep_totals = rep_source.groupby("Sales Rep")["Revenue"].sum().nlargest(8).index
     rep_revenue = (
         rep_source[rep_source["Sales Rep"].isin(rep_totals)]
-        .groupby(["Week Ending", "Sales Rep"])["Revenue"]
+        .groupby(["Week Start", "Sales Rep"])["Revenue"]
         .sum()
         .unstack(fill_value=0)
     )
@@ -470,15 +497,15 @@ if not rep_source.empty:
     rep_lb_source = rep_source[rep_source["Eligible Lbs"] > 0].copy()
     if not rep_lb_source.empty:
         rep_lb = (
-            rep_lb_source.groupby(["Week Ending", "Sales Rep"])
+            rep_lb_source.groupby(["Week Start", "Sales Rep"])
             .agg(Eligible_Revenue=("Eligible Revenue", "sum"), Eligible_Lbs=("Eligible Lbs", "sum"))
             .reset_index()
         )
         rep_lb["Weighted $/LB"] = rep_lb["Eligible_Revenue"].div(
-            rep_lb["Eligible Lbs"].replace(0, pd.NA)
+            rep_lb["Eligible_Lbs"].replace(0, pd.NA)
         ).fillna(0.0)
         rep_lb = rep_lb[rep_lb["Sales Rep"].isin(rep_totals)]
-        rep_lb_pivot = rep_lb.pivot(index="Week Ending", columns="Sales Rep", values="Weighted $/LB").fillna(0)
+        rep_lb_pivot = rep_lb.pivot(index="Week Start", columns="Sales Rep", values="Weighted $/LB").fillna(0)
         with right:
             section("$/LB by Sales Representative", "Weighted weekly pricing using only eligible non-retail pounds.")
             st.plotly_chart(
