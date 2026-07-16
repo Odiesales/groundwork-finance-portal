@@ -172,8 +172,42 @@ def apply_multiselect_filter(df,label,column,sidebar=True):
     return df[df[column].fillna("Unknown").astype(str).isin(selected)] if selected else df
 
 def chart_layout(fig,height=360):
-    fig.update_layout(height=height,paper_bgcolor="rgba(0,0,0,0)",plot_bgcolor="rgba(0,0,0,0)",font=dict(color=CHARCOAL,family="Arial"),margin=dict(l=10,r=10,t=20,b=10),legend=dict(orientation="h",yanchor="bottom",y=1.02,xanchor="right",x=1))
-    fig.update_xaxes(showgrid=False,zeroline=False);fig.update_yaxes(gridcolor="#E5DED2",zeroline=False)
+    # Keep chart typography consistent and readable on the light report theme.
+    fig.update_layout(
+        height=height,
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
+        font=dict(color=CHARCOAL, family="Arial, sans-serif", size=14),
+        margin=dict(l=18, r=28, t=28, b=18),
+        legend=dict(
+            orientation="h",
+            yanchor="bottom",
+            y=1.02,
+            xanchor="right",
+            x=1,
+            font=dict(color=CHARCOAL, size=13),
+        ),
+        hoverlabel=dict(
+            bgcolor="#FFFFFF",
+            bordercolor=BORDER,
+            font=dict(color=CHARCOAL, family="Arial, sans-serif", size=13),
+        ),
+    )
+    fig.update_xaxes(
+        showgrid=False,
+        zeroline=False,
+        tickfont=dict(color=CHARCOAL, size=13),
+        title_font=dict(color=CHARCOAL, size=14),
+        automargin=True,
+    )
+    fig.update_yaxes(
+        gridcolor="#E5DED2",
+        zeroline=False,
+        tickfont=dict(color=CHARCOAL, size=13),
+        title_font=dict(color=CHARCOAL, size=14),
+        automargin=True,
+    )
+    fig.update_traces(textfont=dict(color=CHARCOAL, size=12))
     return fig
 
 def bar_chart(df,x,y,title=None,orientation=None,text=None):

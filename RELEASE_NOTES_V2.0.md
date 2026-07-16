@@ -26,3 +26,8 @@ Validated release candidate for CEO review and Streamlit deployment.
 
 ## Deployment
 Upload the contents of this folder to the existing GitHub repository and redeploy/reboot the Streamlit app. The entry point remains `app.py`.
+
+## July 16, 2026 UI update
+- Increased and darkened graph axis, legend, data-label, and hover fonts across the portal.
+- Added Chargebacks filters for Customer, Deduction Type, Channel, Sales Rep, and Bucket.
+- Kept Holdbacks available as a separate invoice view and excluded from chargeback KPIs.

@@ -36,13 +36,14 @@ if df.empty:
 
 for col, default in {
     'Reporting Customer':'Unknown', 'Channel Clean':'Unknown', 'Sales Rep: Name':'Unknown',
-    'Transaction Type':'Invoice', 'Deduction Type':'', 'Open Balance':0, 'Age':0,
+    'Transaction Type':'Invoice', 'Deduction Type':'', 'Open Balance':0, 'Age':0, 'Bucket':'Unknown',
     'Document Number':'', 'Memo':'', 'Date':pd.NaT,
 }.items():
     if col not in df.columns: df[col] = default
 
 df['Open Balance'] = money_series(df['Open Balance'])
 df['Age'] = pd.to_numeric(df['Age'], errors='coerce').fillna(0)
+df['Bucket'] = df['Bucket'].fillna('Unknown').astype(str).str.strip().replace('', 'Unknown')
 df['Transaction Type Normalized'] = df['Transaction Type'].fillna('').astype(str).str.strip().str.casefold()
 df['Deduction Type'] = df['Deduction Type'].fillna('').astype(str).str.strip()
 df['Deduction Type Normalized'] = df['Deduction Type'].str.casefold()
@@ -52,28 +53,37 @@ chargebacks = df[df['Transaction Type Normalized'].eq('chargeback')].copy()
 holdbacks = df[(df['Transaction Type Normalized'].eq('invoice')) & (df['Deduction Type Normalized'].eq('holdback'))].copy()
 
 st.markdown('<div class="gw-filter-panel">', unsafe_allow_html=True)
-f1,f2,f3,f4,f5 = st.columns([1.35,1,1,1,1])
+view = st.radio(
+    'Record View',
+    ['Chargebacks', 'Holdbacks (Invoices)'],
+    horizontal=True,
+    help='Holdbacks remain invoices and are excluded from chargeback KPIs.',
+)
+filter_source = holdbacks if view.startswith('Holdbacks') else chargebacks
+f1, f2, f3, f4, f5 = st.columns([1.35, 1.1, 1.1, 1.1, 1])
 with f1:
-    customers = ['All Customers'] + sorted(chargebacks['Reporting Customer'].dropna().astype(str).unique().tolist())
+    customers = ['All Customers'] + sorted(filter_source['Reporting Customer'].dropna().astype(str).unique().tolist())
     customer = st.selectbox('Customer', customers)
 with f2:
-    channels = ['All Channels'] + sorted(chargebacks['Channel Clean'].dropna().astype(str).unique().tolist())
-    channel = st.selectbox('Sales Channel', channels)
-with f3:
-    deductions = ['All Deduction Types'] + sorted(x for x in chargebacks['Deduction Type'].dropna().astype(str).unique() if x)
+    deductions = ['All Deduction Types'] + sorted(x for x in filter_source['Deduction Type'].dropna().astype(str).unique() if x)
     deduction = st.selectbox('Deduction Type', deductions)
+with f3:
+    channels = ['All Channels'] + sorted(filter_source['Channel Clean'].dropna().astype(str).unique().tolist())
+    channel = st.selectbox('Channel', channels)
 with f4:
-    reps = ['All Sales Reps'] + sorted(chargebacks['Sales Rep: Name'].dropna().astype(str).unique().tolist())
+    reps = ['All Sales Reps'] + sorted(filter_source['Sales Rep: Name'].dropna().astype(str).unique().tolist())
     rep = st.selectbox('Sales Rep', reps)
 with f5:
-    view = st.selectbox('View', ['Chargebacks', 'Holdbacks (Invoices)'])
+    buckets = ['All Buckets'] + sorted(filter_source['Bucket'].dropna().astype(str).unique().tolist())
+    bucket = st.selectbox('Bucket', buckets)
 st.markdown('</div>', unsafe_allow_html=True)
 
-base = holdbacks.copy() if view.startswith('Holdbacks') else chargebacks.copy()
+base = filter_source.copy()
 if customer != 'All Customers': base = base[base['Reporting Customer'].astype(str).eq(customer)]
+if deduction != 'All Deduction Types': base = base[base['Deduction Type'].eq(deduction)]
 if channel != 'All Channels': base = base[base['Channel Clean'].astype(str).eq(channel)]
-if deduction != 'All Deduction Types' and not view.startswith('Holdbacks'): base = base[base['Deduction Type'].eq(deduction)]
 if rep != 'All Sales Reps': base = base[base['Sales Rep: Name'].astype(str).eq(rep)]
+if bucket != 'All Buckets': base = base[base['Bucket'].astype(str).eq(bucket)]
 
 if view.startswith('Holdbacks'):
     section('Open Holdbacks', 'Holdbacks are classified as Invoice with Deduction Type = Holdback and are excluded from chargeback totals.')
@@ -109,11 +119,15 @@ if not hist.empty:
     hist['Transaction Type Normalized'] = hist['Transaction Type'].fillna('').astype(str).str.strip().str.casefold()
     hist['Deduction Type'] = hist['Deduction Type'].fillna('').astype(str).str.strip()
     hist['Open Balance'] = money_series(hist['Open Balance'])
+    if 'Bucket' not in hist.columns:
+        hist['Bucket'] = 'Unknown'
+    hist['Bucket'] = hist['Bucket'].fillna('Unknown').astype(str).str.strip().replace('', 'Unknown')
     hist = hist[hist['Transaction Type Normalized'].eq('chargeback')]
     if customer != 'All Customers': hist = hist[hist['Reporting Customer'].astype(str).eq(customer)]
     if channel != 'All Channels': hist = hist[hist['Channel Clean'].astype(str).eq(channel)]
     if deduction != 'All Deduction Types': hist = hist[hist['Deduction Type'].eq(deduction)]
     if rep != 'All Sales Reps': hist = hist[hist['Sales Rep: Name'].astype(str).eq(rep)]
+    if bucket != 'All Buckets': hist = hist[hist['Bucket'].astype(str).eq(bucket)]
     hist['As Of'] = hist['Snapshot Date'].dt.strftime('%b-%y')
     matrix = pd.pivot_table(hist, index='Deduction Type', columns='As Of', values='Open Balance', aggfunc='sum', fill_value=0)
 else:
