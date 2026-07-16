@@ -21,11 +21,18 @@ st.markdown("""<style>
 .kpi-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}.kpi-card{background:#fff;border:1px solid #D8D1C5;border-left:4px solid #E6B92F;border-radius:11px;padding:18px 18px;min-height:116px}.kpi-label{color:#5B6259;font-size:.88rem;font-weight:800}.kpi-value{color:#22251F;font-size:2rem;line-height:1.12;font-weight:900;margin-top:8px;white-space:nowrap}
 .report-table-wrap{overflow:auto;border:1px solid #E3DDD2;border-radius:10px;background:#fff}table.report-table{border-collapse:collapse;width:100%;min-width:900px;font-size:.79rem;color:#22251F}table.report-table th{position:sticky;top:0;z-index:1;background:#EEE9DF;color:#22251F;font-weight:800;text-align:left;padding:9px 10px;border-bottom:1px solid #D8D1C5;white-space:nowrap}table.report-table td{background:#fff;color:#22251F;padding:8px 10px;border-bottom:1px solid #ECE7DF;white-space:nowrap}table.report-table tr:nth-child(even) td{background:#FCFAF7}table.report-table td.num,table.report-table th.num{text-align:right;font-variant-numeric:tabular-nums}.badge-red{color:#B42318;font-weight:800}.badge-green{color:#067647;font-weight:800}.badge-amber{color:#B54708;font-weight:800}.terms-heading{font-size:1.8rem;line-height:1.2;font-weight:900;color:#0B4A3A;margin:30px 0 14px}.terms-heading.credit-card{color:#D96B00}.empty-box{background:#EDF7ED;color:#286B35;padding:12px 14px;border-radius:8px;font-weight:650}@media(max-width:900px){.kpi-grid{grid-template-columns:1fr}.section-title{font-size:1.45rem}.terms-heading{font-size:1.5rem}.kpi-value{font-size:1.72rem}}
 
-/* Make "Rank Top 25 by" label white */
-div[data-testid="stSelectbox"] label[data-testid="stWidgetLabel"],
-.stSelectbox label {
+/* === FORCE WHITE LABEL FOR RANK TOP 25 === */
+div[data-testid="stSelectbox"] label,
+label[data-testid="stWidgetLabel"],
+.stSelectbox > label,
+.stSelectbox label span {
     color: white !important;
     font-weight: 700 !important;
+}
+
+/* Extra aggressive targeting */
+[data-testid="stSelectbox"] label {
+    color: white !important;
 }
 </style>""", unsafe_allow_html=True)
 
