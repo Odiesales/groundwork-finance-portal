@@ -145,7 +145,8 @@ def clean_uploaded_ar_report(uploaded_file):
 
     if "Memo" not in df.columns:
         df["Memo"] = ""
-    df[["Transaction Type", "Transaction Reason"]] = df.apply(classify_transaction, axis=1)
+    df[["Transaction Type", "Deduction Type"]] = df.apply(classify_transaction, axis=1)
+    # Backward compatibility for older exports is handled in utils.data.prep_ar.
 
     if "Open Balance" in df.columns:
         df["Open Balance"] = pd.to_numeric(df["Open Balance"], errors="coerce").fillna(0)

@@ -56,7 +56,7 @@ def _weekly_activity(df: pd.DataFrame, snapshot_date: pd.Timestamp | None) -> di
     start = snapshot_date - pd.Timedelta(days=6)
     week = work[work["Date"].between(start, snapshot_date, inclusive="both")].copy()
     transaction = _norm_text(week["Transaction Type"])
-    reason = _norm_text(week["Transaction Reason"])
+    reason = _norm_text(week["Deduction Type"])
     gross = pd.to_numeric(week.get("Amount (Gross)", 0), errors="coerce").fillna(0).abs()
     open_balance = pd.to_numeric(week.get("Open Balance", 0), errors="coerce").fillna(0).abs()
 
@@ -155,7 +155,7 @@ with left:
         hovertemplate="%{y}: $%{x:,.0f}<extra></extra>",
     ))
     fig.update_layout(yaxis=dict(autorange="reversed"))
-    st.plotly_chart(chart_layout(fig, height=335), use_container_width=True)
+    st.plotly_chart(chart_layout(fig, height=335), width='stretch')
 
 with right:
     section("Top Customer Exposure", "Largest open balances in the current snapshot.")
@@ -165,7 +165,7 @@ with right:
         text=[format_money(v, 2) for v in top.values], textposition="auto",
         hovertemplate="%{y}: $%{x:,.0f}<extra></extra>",
     ))
-    st.plotly_chart(chart_layout(fig, height=335), use_container_width=True)
+    st.plotly_chart(chart_layout(fig, height=335), width='stretch')
 
 section("Executive Watchlist", "Accounts with the largest aged balances and collection exposure.")
 watch = current.copy()
@@ -184,7 +184,7 @@ watchlist["Priority"] = np.select(
 watchlist = watchlist.sort_values(["90+ Balance", "Past Due"], ascending=False).head(12)
 st.dataframe(
     watchlist.style.format({"Open Balance":"${:,.2f}", "Past Due":"${:,.2f}", "90+ Balance":"${:,.2f}", "Past Due %":"{:.1%}"}),
-    use_container_width=True, hide_index=True,
+    width='stretch', hide_index=True,
 )
 
 section("Largest Customer Changes", "Week-over-week movement by customer.")
@@ -201,9 +201,9 @@ else:
     c1, c2 = st.columns(2, gap="large")
     with c1:
         section("Largest Increases")
-        st.dataframe(style_money_table(increases), use_container_width=True, hide_index=True)
+        st.dataframe(style_money_table(increases), width='stretch', hide_index=True)
     with c2:
         section("Largest Reductions")
-        st.dataframe(style_money_table(reductions), use_container_width=True, hide_index=True)
+        st.dataframe(style_money_table(reductions), width='stretch', hide_index=True)
 
 footer()

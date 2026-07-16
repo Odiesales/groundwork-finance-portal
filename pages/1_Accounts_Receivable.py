@@ -115,7 +115,7 @@ def render_table(df, money_cols=None, integer_cols=None, max_height=560):
 
     st.dataframe(
         styler,
-        use_container_width=True,
+        width='stretch',
         hide_index=True,
         height=min(max_height, max(120, 38 * (len(display) + 1))),
         column_config=column_config,
@@ -145,7 +145,7 @@ for label, col in [
     ("Customer", "Reporting Customer"), ("Channel", channel_col),
     ("Sales Rep", "Sales Rep: Name"), ("Terms", "Terms: Name"),
     ("Bucket", "Bucket"), ("Transaction Type", "Transaction Type"),
-    ("Transaction Reason", "Transaction Reason"),
+    ("Deduction Type", "Deduction Type"),
 ]:
     df = apply_multiselect_filter(df, label, col)
 
@@ -163,7 +163,7 @@ for col in ["Open Balance", "Age"]:
         df[col] = 0
     df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0)
 for col, default in [
-    ("Transaction Type", ""), ("Transaction Reason", ""), ("Terms: Name", "—"),
+    ("Transaction Type", ""), ("Deduction Type", ""), ("Terms: Name", "—"),
     ("Sales Rep: Name", "—"), ("Reporting Customer", "Unknown"), ("Bucket", "Unknown"),
 ]:
     if col not in df.columns:
@@ -181,7 +181,7 @@ df["Bucket"] = (
     .str.replace(r"^Current.*$", "Current", regex=True, case=False)
 )
 df["Transaction Type Normalized"] = df["Transaction Type"].astype(str).str.strip().str.casefold()
-df["Transaction Reason Normalized"] = df["Transaction Reason"].astype(str).str.strip().str.casefold()
+df["Deduction Type Normalized"] = df["Deduction Type"].astype(str).str.strip().str.casefold()
 
 if "Due Date" in df.columns:
     df["Due Date Parsed"] = pd.to_datetime(df["Due Date"], errors="coerce")
@@ -191,10 +191,10 @@ else:
 is_chargeback = df["Transaction Type Normalized"].str.contains("chargeback", na=False)
 is_credit = df["Transaction Type Normalized"].str.contains("credit", na=False)
 is_payment = df["Transaction Type Normalized"].str.contains("payment", na=False)
-is_holdback = df["Transaction Reason Normalized"].eq("holdback")
+is_holdback = df["Deduction Type Normalized"].eq("holdback")
 # Treat remaining open AR rows as invoices; this is more reliable across NetSuite export labels.
 is_invoice = ~(is_chargeback | is_credit | is_payment)
-is_recovery = df["Transaction Reason Normalized"].isin({"duplicate pmt", "overpayment", "pmt transfer", "on account payment (oap)"})
+is_recovery = df["Deduction Type Normalized"].isin({"duplicate pmt", "overpayment", "pmt transfer", "on account payment (oap)"})
 
 invoice_rows = df[is_invoice & ~is_holdback].copy()
 chargeback_rows = df[is_chargeback].copy()
@@ -224,7 +224,7 @@ section_end()
 
 records = []
 for customer, group in df.groupby("Reporting Customer", dropna=False):
-    inv = group[(~group["Transaction Type Normalized"].str.contains("chargeback|credit|payment", regex=True, na=False)) & ~group["Transaction Reason Normalized"].eq("holdback")].copy()
+    inv = group[(~group["Transaction Type Normalized"].str.contains("chargeback|credit|payment", regex=True, na=False)) & ~group["Deduction Type Normalized"].eq("holdback")].copy()
     cb = group[group["Transaction Type Normalized"].str.contains("chargeback", na=False)].copy()
     positive_inv = inv[inv["Open Balance"] > 0]
     past_due_balance = inv.loc[inv["Bucket"].isin(PAST_DUE_BUCKETS), "Open Balance"].sum()
@@ -310,7 +310,7 @@ fig.update_layout(
     yaxis=dict(automargin=True, tickfont=dict(size=13, color="#111827"), title_font=dict(size=15, color="#111827"), tickformat="$,.0f", gridcolor="#d7dce3", linecolor="#111827"),
     showlegend=False,
 )
-st.plotly_chart(fig, use_container_width=True, theme=None)
+st.plotly_chart(fig, width='stretch', theme=None)
 
 st.markdown("### Aging by Channel by Bucket")
 channel_matrix = pd.pivot_table(df, index=channel_col, columns="Bucket", values="Open Balance", aggfunc="sum", fill_value=0)
@@ -327,7 +327,7 @@ channel_fig.update_layout(
     xaxis=dict(automargin=True, tickangle=-20, tickfont=dict(size=13, color="#111827"), title="Channel"),
     yaxis=dict(automargin=True, tickformat="$,.0f", tickfont=dict(size=13, color="#111827"), title="Open Balance", gridcolor="#d7dce3"),
 )
-st.plotly_chart(channel_fig, use_container_width=True, theme=None)
+st.plotly_chart(channel_fig, width='stretch', theme=None)
 with st.expander("View Channel Aging Detail"):
     render_table(channel_matrix, money_cols=BUCKET_ORDER + ["Grand Total"], max_height=520)
 
@@ -344,5 +344,5 @@ render_table(terms_matrix, money_cols=BUCKET_ORDER + ["Grand Total"], max_height
 section_end()
 
 with st.expander("Transaction Detail"):
-    st.dataframe(df, use_container_width=True, hide_index=True, height=620)
+    st.dataframe(df, width='stretch', hide_index=True, height=620)
 footer()

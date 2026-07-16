@@ -66,10 +66,13 @@ def prep_ar(df):
         'Bucket': 'Unknown',
         'Open Balance': 0,
         'Transaction Type': 'Invoice',
-        'Transaction Reason': '',
+        'Deduction Type': '',
         'Memo': '',
         'Snapshot Date': pd.NaT,
     }
+    # Upgrade older snapshots without requiring users to re-upload them.
+    if 'Deduction Type' not in df.columns and 'Transaction Reason' in df.columns:
+        df['Deduction Type'] = df['Transaction Reason']
     for col, default in defaults.items():
         if col not in df.columns:
             df[col] = default

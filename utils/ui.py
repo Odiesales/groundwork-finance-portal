@@ -10,16 +10,16 @@ import streamlit as st
 
 from utils.paths import ASSETS_DIR
 
-CREAM = "#F6F1E8"
+CREAM = "#F7F4EE"
 CARD = "#FFFFFF"
-CHARCOAL = "#22251F"
-MUTED = "#6F736A"
-YELLOW = "#E6B92F"
-BORDER = "#D8D1C5"
-GREEN = "#143E33"
-GREEN_2 = "#285B4B"
-GREEN_PALE = "#E7EFEA"
-RED = "#A44739"
+CHARCOAL = "#202020"
+MUTED = "#66645F"
+YELLOW = "#F2B51D"
+BORDER = "#DED9D0"
+GREEN = "#202020"
+GREEN_2 = "#F2B51D"
+GREEN_PALE = "#FFF5D7"
+RED = "#C93C32"
 
 
 def _asset_uri(path: Path) -> str:
@@ -33,7 +33,7 @@ def inject_global_css() -> None:
     mark = _asset_uri(ASSETS_DIR / "Groundwork_mark_white.png")
     st.markdown(f"""
 <style>
-:root{{--gw-cream:{CREAM};--gw-card:{CARD};--gw-charcoal:{CHARCOAL};--gw-muted:{MUTED};--gw-yellow:{YELLOW};--gw-border:{BORDER};--gw-green:{GREEN};--gw-green2:{GREEN_2};--gw-red:{RED};}}
+:root{{--gw-cream:{CREAM};--gw-card:{CARD};--gw-charcoal:{CHARCOAL};--gw-muted:{MUTED};--gw-yellow:{YELLOW};--gw-border:{BORDER};--gw-green:{GREEN};--gw-green2:{GREEN_2};--gw-green-pale:{GREEN_PALE};--gw-red:{RED};}}
 html,body,[class*="css"]{{color:var(--gw-charcoal)}}
 .stApp,[data-testid="stAppViewContainer"],[data-testid="stMain"]{{background:var(--gw-cream)!important}}
 /* Remove Streamlit's black application chrome */
@@ -43,10 +43,10 @@ html,body,[class*="css"]{{color:var(--gw-charcoal)}}
 #MainMenu,
 footer{{display:none!important;visibility:hidden!important;height:0!important}}
 [data-testid="stAppViewContainer"] > .main{{top:0!important}}
-.block-container{{max-width:1500px;padding:.35rem 2.1rem 3rem}}
+.block-container{{max-width:1500px;padding:.75rem 2.1rem 3rem}}
 
 /* One shared sidebar shell */
-[data-testid="stSidebar"]{{background:var(--gw-green)!important;border-right:0!important}}
+[data-testid="stSidebar"]{{background:linear-gradient(180deg,#171717 0%,#242424 100%)!important;border-right:0!important}}
 [data-testid="stSidebarContent"]{{padding-top:.25rem}}
 [data-testid="stSidebar"] *{{color:#F8F5EE!important}}
 [data-testid="stSidebarNav"]{{padding:.25rem .65rem 0!important}}
@@ -60,8 +60,8 @@ footer{{display:none!important;visibility:hidden!important;height:0!important}}
 [data-testid="stSidebarNav"] li{{border-radius:10px;overflow:hidden}}
 [data-testid="stSidebarNav"] a{{border-radius:10px!important;padding:.82rem .85rem!important;font-size:1.02rem!important;font-weight:760!important}}
 [data-testid="stSidebarNav"] a:hover{{background:rgba(255,255,255,.10)!important}}
-[data-testid="stSidebarNav"] a[aria-current="page"]{{background:#F4F0E8!important}}
-[data-testid="stSidebarNav"] a[aria-current="page"] *{{color:var(--gw-green)!important}}
+[data-testid="stSidebarNav"] a[aria-current="page"]{{background:var(--gw-yellow)!important}}
+[data-testid="stSidebarNav"] a[aria-current="page"] *{{color:#171717!important}}
 .gw-sidebar-status{{margin:1rem .9rem .45rem;padding:.85rem .9rem;border-radius:12px;background:rgba(255,255,255,.09);border:1px solid rgba(255,255,255,.15)}}
 .gw-sidebar-status-label{{font-size:.66rem;text-transform:uppercase;letter-spacing:.1em;color:#CFE0D7!important}}
 .gw-sidebar-status-value{{font-size:.86rem;font-weight:800;margin-top:.25rem}}
@@ -72,25 +72,30 @@ div[data-baseweb="popover"],div[data-baseweb="menu"],ul[role="listbox"],li[role=
 
 /* Shared banner */
 .gw-page-head{{display:flex;justify-content:space-between;align-items:center;gap:1.4rem;background:#fff;border:1px solid var(--gw-border);border-radius:18px;padding:1rem 1.45rem;margin:0 0 1.35rem;box-shadow:0 9px 26px rgba(37,46,39,.06)}}
-.gw-greeting{{color:var(--gw-green2);font-size:.92rem;font-weight:850;margin-bottom:.28rem}}
-.gw-page-head h1.gw-page-title{{margin:0!important;color:#143E33!important;-webkit-text-fill-color:#143E33!important;font-size:2.85rem!important;line-height:1.03!important;font-weight:900!important;letter-spacing:-.04em!important;opacity:1!important;text-shadow:none!important}}
+.gw-greeting{{color:#8A6510;font-size:.92rem;font-weight:850;margin-bottom:.28rem}}
+.gw-page-head h1.gw-page-title{{margin:0!important;color:#202020!important;-webkit-text-fill-color:#202020!important;font-size:2.85rem!important;line-height:1.03!important;font-weight:900!important;letter-spacing:-.04em!important;opacity:1!important;text-shadow:none!important}}
 .gw-page-subtitle{{color:#50564E;font-size:1.08rem;line-height:1.45;margin-top:.48rem;font-weight:520}}
-.gw-head-status{{min-width:195px;background:var(--gw-green-pale);border:1px solid #CAD9D0;border-radius:12px;padding:.82rem 1rem;text-align:right;color:var(--gw-green)}}
-.gw-head-status strong{{color:var(--gw-green);font-size:.92rem}} .gw-head-status small{{display:block;color:#50564E;font-size:.82rem;margin-top:.18rem}}
-.gw-section-title{{font-size:1.72rem;line-height:1.2;font-weight:880;margin:1.55rem 0 .18rem;color:var(--gw-green)}}
+.gw-head-status{{min-width:195px;background:var(--gw-green-pale);border:1px solid #CAD9D0;border-radius:12px;padding:.82rem 1rem;text-align:right;color:var(--gw-charcoal)}}
+.gw-head-status strong{{color:var(--gw-charcoal);font-size:.92rem}} .gw-head-status small{{display:block;color:#50564E;font-size:.82rem;margin-top:.18rem}}
+.gw-section-title{{font-size:1.72rem;line-height:1.2;font-weight:880;margin:1.55rem 0 .18rem;color:var(--gw-charcoal)}}
 .gw-section-caption{{color:#596057;font-size:1rem;line-height:1.4;margin-bottom:.78rem}}
 .gw-card{{background:#fff;border:1px solid var(--gw-border);border-radius:14px;box-shadow:0 7px 22px rgba(37,46,39,.05);padding:1rem 1.05rem}}
 .gw-kpi{{min-height:134px;position:relative;overflow:hidden}} .gw-kpi:before{{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--gw-yellow)}}
 .gw-kpi-label{{color:#5B6259;font-size:.82rem;text-transform:uppercase;letter-spacing:.075em;font-weight:820}}
 .gw-kpi-value{{font-size:2rem;line-height:1.12;font-weight:900;margin-top:.5rem;color:var(--gw-charcoal);white-space:nowrap}}
-.gw-kpi-delta{{font-size:.88rem;font-weight:760;margin-top:.58rem}} .gw-positive{{color:var(--gw-green2)}} .gw-negative{{color:var(--gw-red)}} .gw-neutral{{color:var(--gw-muted)}}
+.gw-kpi-delta{{font-size:.88rem;font-weight:760;margin-top:.58rem}} .gw-positive{{color:#14823B}} .gw-negative{{color:var(--gw-red)}} .gw-neutral{{color:var(--gw-muted)}}
 .gw-insight{{background:#FEFBF3;border:1px solid #E6D8AC;border-left:5px solid var(--gw-yellow);border-radius:14px;padding:1rem 1.15rem}}
-.gw-insight-title{{font-size:1.25rem;font-weight:880;color:var(--gw-green);margin-bottom:.45rem}} .gw-insight p{{font-size:1rem;line-height:1.45;margin:.28rem 0;color:#383D37!important}}
+.gw-insight-title{{font-size:1.25rem;font-weight:880;color:var(--gw-charcoal);margin-bottom:.45rem}} .gw-insight p{{font-size:1rem;line-height:1.45;margin:.28rem 0;color:#383D37!important}}
 [data-testid="stDataFrame"],[data-testid="stTable"]{{background:#fff!important;border:1px solid var(--gw-border)!important;border-radius:14px;overflow:hidden;box-shadow:0 7px 22px rgba(37,46,39,.04)}}
-[data-testid="stDataFrame"] *{{font-size:.95rem!important}}
+[data-testid="stDataFrame"] *{{font-size:.95rem!important;color:#202020!important}}
 [data-testid="stSelectbox"] label,[data-testid="stMultiSelect"] label,[data-testid="stTextInput"] label{{font-size:.95rem!important;font-weight:720!important}}
 table{{background:#fff!important;color:var(--gw-charcoal)!important}} thead tr th{{background:#EEE9DF!important;color:var(--gw-charcoal)!important}} tbody tr td{{background:#fff!important;color:var(--gw-charcoal)!important}}
 .gw-footer{{margin-top:2rem;padding-top:.9rem;border-top:1px solid var(--gw-border);color:var(--gw-muted);font-size:.75rem;text-align:center}}
+
+.gw-filter-panel{{background:#fff;border:1px solid var(--gw-border);border-radius:14px;padding:.75rem 1rem .2rem;margin:.25rem 0 1rem;box-shadow:0 5px 16px rgba(0,0,0,.035)}}
+[data-testid="stSelectbox"] div[data-baseweb="select"]>div,[data-testid="stMultiSelect"] div[data-baseweb="select"]>div,[data-testid="stTextInput"] div[data-baseweb="input"]{{background:#fff!important;color:#202020!important;border-color:#D5D0C7!important}}
+[data-testid="stSelectbox"] *,[data-testid="stMultiSelect"] *,[data-testid="stTextInput"] *{{color:#202020!important;-webkit-text-fill-color:#202020!important}}
+.stButton>button,.stDownloadButton>button{{background:var(--gw-yellow)!important;color:#171717!important;border:1px solid #D69D0F!important;font-weight:800!important;border-radius:8px!important;min-height:2.65rem!important}}.stButton>button:hover,.stDownloadButton>button:hover{{background:#E2A711!important;border-color:#C78E08!important;color:#111!important}}
 @media(max-width:900px){{.gw-page-head{{display:block}}.gw-head-status{{margin-top:.8rem;text-align:left}}.gw-page-title{{font-size:2.15rem}}.gw-section-title{{font-size:1.45rem}}.gw-kpi-value{{font-size:1.72rem}}}}
 </style>""", unsafe_allow_html=True)
 
@@ -173,12 +178,12 @@ def chart_layout(fig,height=360):
 
 def bar_chart(df,x,y,title=None,orientation=None,text=None):
     import plotly.express as px
-    fig=px.bar(df,x=x,y=y,title=title,orientation=orientation,text=text);fig.update_traces(marker_color=GREEN_2,marker_line_color=GREEN,marker_line_width=.4)
+    fig=px.bar(df,x=x,y=y,title=title,orientation=orientation,text=text);fig.update_traces(marker_color=YELLOW,marker_line_color="#B98500",marker_line_width=.4)
     return chart_layout(fig)
 
 def line_chart(df,x,y,title=None):
     import plotly.express as px
-    fig=px.line(df,x=x,y=y,title=title,markers=True);fig.update_traces(line_color=GREEN_2,marker=dict(color=YELLOW,size=8,line=dict(color=GREEN,width=1)))
+    fig=px.line(df,x=x,y=y,title=title,markers=True);fig.update_traces(line_color=YELLOW,marker=dict(color=YELLOW,size=8,line=dict(color="#B98500",width=1)))
     return chart_layout(fig)
 
 def style_money_table(df):

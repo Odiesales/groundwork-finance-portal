@@ -27,6 +27,7 @@ inject_global_css()
 pages = [
     st.Page("pages/0_Executive_Scorecard.py", title="Executive Scorecard", icon="🏠", default=True),
     st.Page("pages/1_Accounts_Receivable.py", title="Accounts Receivable", icon="💰"),
+    st.Page("pages/2_Chargebacks.py", title="Chargebacks", icon="🏷️"),
     st.Page("pages/2_Revenue.py", title="Weekly Revenue Report", icon="📈"),
     st.Page("pages/3_Trends.py", title="Trends", icon="📊"),
     st.Page("pages/99_Admin.py", title="Administration", icon="⚙️"),

@@ -18,7 +18,6 @@ from utils.ui import (
 )
 
 
-st.set_page_config(page_title="Weekly Revenue Report", page_icon="📈", layout="wide")
 page_header(
     "Weekly Revenue Report",
     "Weekly revenue, roasted-coffee pounds, weighted $/LB, channel performance, and sales trends.",
@@ -472,13 +471,13 @@ with st.container(border=True):
 # Weekly trends
 # -----------------------------------------------------------------------------
 section("Wholesale Sales by Week", "Revenue trend through the selected reporting week.")
-st.plotly_chart(revenue_trend_chart(weekly), use_container_width=True)
+st.plotly_chart(revenue_trend_chart(weekly), width='stretch')
 
 section(
     "Sales: Roasted Coffee, Lbs and $/LB",
     "Revenue is shown for all filtered transactions. Lbs and weighted $/LB exclude Retail and rows without positive pounds.",
 )
-st.plotly_chart(combo_chart(weekly, ""), use_container_width=True)
+st.plotly_chart(combo_chart(weekly, ""), width='stretch')
 
 # -----------------------------------------------------------------------------
 # Channel-specific weekly analysis
@@ -496,12 +495,12 @@ for tab, channel_name in zip(channel_tabs, ["Grocery", "Foodservice", "E-Commerc
                 lambda value: f"W{int((value + pd.Timedelta(days=1)).isocalendar().week)} • {value:%b %d}"
             )
             if channel_name == "Retail":
-                st.plotly_chart(revenue_trend_chart(channel_weekly), use_container_width=True)
+                st.plotly_chart(revenue_trend_chart(channel_weekly), width='stretch')
                 st.caption("Retail is revenue-only and is intentionally excluded from pounds and $/LB.")
             else:
                 st.plotly_chart(
                     combo_chart(channel_weekly, ""),
-                    use_container_width=True,
+                    width='stretch',
                 )
 
 # -----------------------------------------------------------------------------
@@ -520,7 +519,7 @@ if not retail_trend.empty:
     section("Retail: By Location", "Weekly revenue for the leading retail locations.")
     st.plotly_chart(
         line_chart(retail_pivot, "Top Retail Locations — Weekly Revenue", "Revenue", currency=True),
-        use_container_width=True,
+        width='stretch',
     )
 
 # -----------------------------------------------------------------------------
@@ -540,7 +539,7 @@ if not rep_source.empty:
     section("Sales by Sales Representative", "Weekly revenue trends for the top five sales representatives.")
     st.plotly_chart(
         line_chart(rep_revenue, "Top 5 Sales Representatives — Weekly Revenue", "Revenue", currency=True),
-        use_container_width=True,
+        width='stretch',
     )
 
     rep_lb_source = rep_source[rep_source["Eligible Lbs"] > 0].copy()
@@ -558,7 +557,7 @@ if not rep_source.empty:
         section("$/LB by Sales Representative", "Weighted weekly pricing for the top five representatives using eligible non-retail pounds.")
         st.plotly_chart(
             line_chart(rep_lb_pivot, "Top 5 Sales Representatives — Weighted $/LB", "Weighted $/LB", currency=True),
-            use_container_width=True,
+            width='stretch',
         )
 
 # -----------------------------------------------------------------------------
@@ -569,25 +568,25 @@ with left:
     section("Selected Week: Channel Analysis", "Revenue, pounds, mix, and realized $/LB for the selected week.")
     st.dataframe(
         style_revenue_table(revenue_summary(selected_df, "Sales Channel")),
-        use_container_width=True,
+        width='stretch',
         hide_index=True,
     )
 with right:
     section("Selected Week: Top Customers", "Top customers ranked by selected-week revenue.")
     st.dataframe(
         style_revenue_table(revenue_summary(selected_df, "Customer").head(25)),
-        use_container_width=True,
+        width='stretch',
         hide_index=True,
     )
 
 section("Selected Week: Product / Item Pricing")
 st.dataframe(
     style_revenue_table(revenue_summary(selected_df, "Item / Memo").head(75)),
-    use_container_width=True,
+    width='stretch',
     hide_index=True,
 )
 
 with st.expander("Selected Week Revenue Detail"):
-    st.dataframe(selected_df, use_container_width=True, hide_index=True)
+    st.dataframe(selected_df, width='stretch', hide_index=True)
 
 footer()
