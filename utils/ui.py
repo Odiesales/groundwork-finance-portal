@@ -68,7 +68,15 @@ footer{{display:none!important;visibility:hidden!important;height:0!important}}
 [data-testid="stSidebar"] h1,[data-testid="stSidebar"] h2,[data-testid="stSidebar"] h3{{color:#fff!important}}
 [data-testid="stSidebar"] input,[data-testid="stSidebar"] textarea,[data-testid="stSidebar"] [contenteditable="true"]{{color:#22251F!important;-webkit-text-fill-color:#22251F!important;caret-color:#22251F!important}}
 [data-testid="stSidebar"] div[data-baseweb="input"],[data-testid="stSidebar"] div[data-baseweb="select"]>div,[data-testid="stSidebar"] [role="combobox"]{{background:#fff!important;color:#22251F!important}}
-div[data-baseweb="popover"],div[data-baseweb="menu"],ul[role="listbox"],li[role="option"],div[role="option"]{{background:#fff!important;color:#22251F!important}}
+/* Keep selected filter values readable inside the dark sidebar. */
+[data-testid="stSidebar"] [data-testid="stSelectbox"] div[data-baseweb="select"] *,
+[data-testid="stSidebar"] [data-testid="stMultiSelect"] div[data-baseweb="select"] *,
+[data-testid="stSidebar"] [role="combobox"] *,
+[data-testid="stSidebar"] div[data-baseweb="tag"] *{{color:#22251F!important;-webkit-text-fill-color:#22251F!important}}
+[data-testid="stSidebar"] div[data-baseweb="tag"]{{background:#F2B51D!important}}
+[data-testid="stSidebar"] div[data-baseweb="select"] svg{{fill:#22251F!important;color:#22251F!important}}
+div[data-baseweb="popover"],div[data-baseweb="menu"],ul[role="listbox"],li[role="option"],div[role="option"]{{background:#fff!important;color:#22251F!important;-webkit-text-fill-color:#22251F!important}}
+li[role="option"] *,div[role="option"] *{{color:#22251F!important;-webkit-text-fill-color:#22251F!important}}
 
 /* Shared banner */
 .gw-page-head{{display:flex;justify-content:space-between;align-items:center;gap:1.4rem;background:#fff;border:1px solid var(--gw-border);border-radius:18px;padding:1rem 1.45rem;margin:0 0 1.35rem;box-shadow:0 9px 26px rgba(37,46,39,.06)}}

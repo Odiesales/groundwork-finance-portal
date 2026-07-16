@@ -5,7 +5,7 @@ import plotly.graph_objects as go
 import streamlit as st
 
 from utils.data import load_ar_history
-from utils.ui import YELLOW, CHARCOAL, MUTED, chart_layout, footer, format_money, kpi_row, page_header, section
+from utils.ui import YELLOW, CHARCOAL, MUTED, chart_layout, footer, format_money, kpi_row, page_header, section, sidebar_snapshot
 
 
 def latest_snapshot(df: pd.DataFrame):
@@ -52,31 +52,31 @@ df['Deduction Type Normalized'] = df['Deduction Type'].str.casefold()
 chargebacks = df[df['Transaction Type Normalized'].eq('chargeback')].copy()
 holdbacks = df[(df['Transaction Type Normalized'].eq('invoice')) & (df['Deduction Type Normalized'].eq('holdback'))].copy()
 
-st.markdown('<div class="gw-filter-panel">', unsafe_allow_html=True)
-view = st.radio(
+sidebar_snapshot(as_of)
+st.sidebar.markdown('### Filters')
+view = st.sidebar.radio(
     'Record View',
     ['Chargebacks', 'Holdbacks (Invoices)'],
-    horizontal=True,
     help='Holdbacks remain invoices and are excluded from chargeback KPIs.',
 )
 filter_source = holdbacks if view.startswith('Holdbacks') else chargebacks
-f1, f2, f3, f4, f5 = st.columns([1.35, 1.1, 1.1, 1.1, 1])
-with f1:
-    customers = ['All Customers'] + sorted(filter_source['Reporting Customer'].dropna().astype(str).unique().tolist())
-    customer = st.selectbox('Customer', customers)
-with f2:
-    deductions = ['All Deduction Types'] + sorted(x for x in filter_source['Deduction Type'].dropna().astype(str).unique() if x)
-    deduction = st.selectbox('Deduction Type', deductions)
-with f3:
-    channels = ['All Channels'] + sorted(filter_source['Channel Clean'].dropna().astype(str).unique().tolist())
-    channel = st.selectbox('Channel', channels)
-with f4:
-    reps = ['All Sales Reps'] + sorted(filter_source['Sales Rep: Name'].dropna().astype(str).unique().tolist())
-    rep = st.selectbox('Sales Rep', reps)
-with f5:
-    buckets = ['All Buckets'] + sorted(filter_source['Bucket'].dropna().astype(str).unique().tolist())
-    bucket = st.selectbox('Bucket', buckets)
-st.markdown('</div>', unsafe_allow_html=True)
+
+customers = ['All Customers'] + sorted(filter_source['Reporting Customer'].dropna().astype(str).unique().tolist())
+customer = st.sidebar.selectbox('Customer', customers)
+
+deductions = ['All Deduction Types'] + sorted(
+    x for x in filter_source['Deduction Type'].dropna().astype(str).unique() if x
+)
+deduction = st.sidebar.selectbox('Deduction Type', deductions)
+
+channels = ['All Channels'] + sorted(filter_source['Channel Clean'].dropna().astype(str).unique().tolist())
+channel = st.sidebar.selectbox('Channel', channels)
+
+reps = ['All Sales Reps'] + sorted(filter_source['Sales Rep: Name'].dropna().astype(str).unique().tolist())
+rep = st.sidebar.selectbox('Sales Rep', reps)
+
+buckets = ['All Buckets'] + sorted(filter_source['Bucket'].dropna().astype(str).unique().tolist())
+bucket = st.sidebar.selectbox('Bucket', buckets)
 
 base = filter_source.copy()
 if customer != 'All Customers': base = base[base['Reporting Customer'].astype(str).eq(customer)]

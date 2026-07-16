@@ -31,3 +31,7 @@ Upload the contents of this folder to the existing GitHub repository and redeplo
 - Increased and darkened graph axis, legend, data-label, and hover fonts across the portal.
 - Added Chargebacks filters for Customer, Deduction Type, Channel, Sales Rep, and Bucket.
 - Kept Holdbacks available as a separate invoice view and excluded from chargeback KPIs.
+
+## Chargebacks sidebar filter fix
+- Moved Record View, Customer, Deduction Type, Channel, Sales Rep, and Bucket filters into the left navigation sidebar.
+- Corrected sidebar select and multiselect text styling so selected values and dropdown options remain readable.
