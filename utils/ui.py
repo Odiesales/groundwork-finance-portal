@@ -67,7 +67,7 @@ footer{{display:none!important;visibility:hidden!important;height:0!important}}
 .gw-sidebar-status-value{{font-size:.86rem;font-weight:800;margin-top:.25rem}}
 [data-testid="stSidebar"] h1,[data-testid="stSidebar"] h2,[data-testid="stSidebar"] h3{{color:#fff!important}}
 [data-testid="stSidebar"] input,[data-testid="stSidebar"] textarea,[data-testid="stSidebar"] [contenteditable="true"]{{color:#22251F!important;-webkit-text-fill-color:#22251F!important;caret-color:#22251F!important}}
-[data-testid="stSidebar"] div[data-baseweb="input"],[data-testid="stSidebar"] div[data-baseweb="select"]>div,[data-testid="stSidebar"] [role="combobox"]{{background:#fff!important;color:#22251F!important}}
+[data-testid="stSidebar"] div[data-baseweb="input"],[data-testid="stSidebar"] div[data-baseweb="select"]>div,[data-testid="stSidebar"] [role="combobox"]{{background:#fff!important;color:#22251F!important;border-radius:7px!important}}
 /* Keep selected filter values readable inside the dark sidebar. */
 [data-testid="stSidebar"] [data-testid="stSelectbox"] div[data-baseweb="select"] *,
 [data-testid="stSidebar"] [data-testid="stMultiSelect"] div[data-baseweb="select"] *,
@@ -83,7 +83,7 @@ li[role="option"] *,div[role="option"] *{{color:#22251F!important;-webkit-text-f
 .gw-greeting{{color:#8A6510;font-size:.92rem;font-weight:850;margin-bottom:.28rem}}
 .gw-page-head h1.gw-page-title{{margin:0!important;color:#202020!important;-webkit-text-fill-color:#202020!important;font-size:2.85rem!important;line-height:1.03!important;font-weight:900!important;letter-spacing:-.04em!important;opacity:1!important;text-shadow:none!important}}
 .gw-page-subtitle{{color:#50564E;font-size:1.08rem;line-height:1.45;margin-top:.48rem;font-weight:520}}
-.gw-head-status{{min-width:195px;background:var(--gw-green-pale);border:1px solid #CAD9D0;border-radius:12px;padding:.82rem 1rem;text-align:right;color:var(--gw-charcoal)}}
+.gw-head-status{{min-width:190px;background:var(--gw-green-pale);border:1px solid #E8CF80;border-radius:12px;padding:.82rem 1rem;text-align:center;color:var(--gw-charcoal)}}
 .gw-head-status strong{{color:var(--gw-charcoal);font-size:.92rem}} .gw-head-status small{{display:block;color:#50564E;font-size:.82rem;margin-top:.18rem}}
 .gw-section-title{{font-size:1.72rem;line-height:1.2;font-weight:880;margin:1.55rem 0 .18rem;color:var(--gw-charcoal)}}
 .gw-section-caption{{color:#596057;font-size:1rem;line-height:1.4;margin-bottom:.78rem}}
@@ -104,6 +104,10 @@ table{{background:#fff!important;color:var(--gw-charcoal)!important}} thead tr t
 [data-testid="stSelectbox"] div[data-baseweb="select"]>div,[data-testid="stMultiSelect"] div[data-baseweb="select"]>div,[data-testid="stTextInput"] div[data-baseweb="input"]{{background:#fff!important;color:#202020!important;border-color:#D5D0C7!important}}
 [data-testid="stSelectbox"] *,[data-testid="stMultiSelect"] *,[data-testid="stTextInput"] *{{color:#202020!important;-webkit-text-fill-color:#202020!important}}
 .stButton>button,.stDownloadButton>button{{background:var(--gw-yellow)!important;color:#171717!important;border:1px solid #D69D0F!important;font-weight:800!important;border-radius:8px!important;min-height:2.65rem!important}}.stButton>button:hover,.stDownloadButton>button:hover{{background:#E2A711!important;border-color:#C78E08!important;color:#111!important}}
+/* Keep all select fields readable, even when a browser restores dark form controls. */
+[data-testid="stSelectbox"] div[data-baseweb="select"]>div,[data-testid="stMultiSelect"] div[data-baseweb="select"]>div{{background:#fff!important;color:#171A18!important}}
+[data-testid="stSelectbox"] div[data-baseweb="select"] span,[data-testid="stSelectbox"] div[data-baseweb="select"] input,[data-testid="stMultiSelect"] div[data-baseweb="select"] span,[data-testid="stMultiSelect"] div[data-baseweb="select"] input{{color:#171A18!important;-webkit-text-fill-color:#171A18!important}}
+[data-testid="stSelectbox"] svg,[data-testid="stMultiSelect"] svg{{fill:#171A18!important;color:#171A18!important}}
 @media(max-width:900px){{.gw-page-head{{display:block}}.gw-head-status{{margin-top:.8rem;text-align:left}}.gw-page-title{{font-size:2.15rem}}.gw-section-title{{font-size:1.45rem}}.gw-kpi-value{{font-size:1.72rem}}}}
 </style>""", unsafe_allow_html=True)
 

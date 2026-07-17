@@ -35,3 +35,11 @@ Upload the contents of this folder to the existing GitHub repository and redeplo
 ## Chargebacks sidebar filter fix
 - Moved Record View, Customer, Deduction Type, Channel, Sales Rep, and Bucket filters into the left navigation sidebar.
 - Corrected sidebar select and multiselect text styling so selected values and dropdown options remain readable.
+
+## AR executive layout refresh
+- Rebuilt the Accounts Receivable sidebar filters as clearly labeled single-select fields with an `All` option.
+- Added a one-click Clear Filters button.
+- Fixed white-on-black and blank selected-value issues in sidebar and page dropdowns.
+- Updated the Executive Summary cards with icons, supporting context, and a cleaner compact layout.
+- Simplified Top 25 Customer Exposure to an executive table with rank, channel, sales rep, terms, past due, total AR, and share of total AR.
+- Added a Top 25 CSV export.

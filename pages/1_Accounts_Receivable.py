@@ -7,7 +7,7 @@ import streamlit as st
 
 from utils.data import prep_ar
 from utils.paths import AR_SNAPSHOT_DIR, CURRENT_AR_PATH
-from utils.ui import apply_multiselect_filter, footer, page_header
+from utils.ui import footer, page_header
 
 BUCKET_ORDER = ["Current", "1-14", "15-30", "31-60", "61-90", "91+"]
 PAST_DUE_BUCKETS = ["1-14", "15-30", "31-60", "61-90", "91+"]
@@ -16,31 +16,19 @@ OVER_90_BUCKETS = ["91+"]
 
 # Local report components preserve the detailed AR workflow while the app shell stays shared.
 st.markdown("""<style>
-.section-card{background:#fff;border:1px solid #D8D1C5;border-radius:14px;padding:22px;margin:26px 0 0;box-shadow:0 7px 22px rgba(37,46,39,.04)}
-.section-title{font-size:1.72rem;line-height:1.2;font-weight:900;color:#0B4A3A}.section-note{font-size:1rem;line-height:1.4;color:#596057;margin:6px 0 18px}
-.kpi-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}.kpi-card{background:#fff;border:1px solid #D8D1C5;border-left:4px solid #E6B92F;border-radius:11px;padding:18px 18px;min-height:116px}.kpi-label{color:#5B6259;font-size:.88rem;font-weight:800}.kpi-value{color:#22251F;font-size:2rem;line-height:1.12;font-weight:900;margin-top:8px;white-space:nowrap}
-.report-table-wrap{overflow:auto;border:1px solid #E3DDD2;border-radius:10px;background:#fff}table.report-table{border-collapse:collapse;width:100%;min-width:900px;font-size:.79rem;color:#22251F}table.report-table th{position:sticky;top:0;z-index:1;background:#EEE9DF;color:#22251F;font-weight:800;text-align:left;padding:9px 10px;border-bottom:1px solid #D8D1C5;white-space:nowrap}table.report-table td{background:#fff;color:#22251F;padding:8px 10px;border-bottom:1px solid #ECE7DF;white-space:nowrap}table.report-table tr:nth-child(even) td{background:#FCFAF7}table.report-table td.num,table.report-table th.num{text-align:right;font-variant-numeric:tabular-nums}.badge-red{color:#B42318;font-weight:800}.badge-green{color:#067647;font-weight:800}.badge-amber{color:#B54708;font-weight:800}.terms-heading{font-size:1.8rem;line-height:1.2;font-weight:900;color:#0B4A3A;margin:30px 0 14px}.terms-heading.credit-card{color:#D96B00}.empty-box{background:#EDF7ED;color:#286B35;padding:12px 14px;border-radius:8px;font-weight:650}@media(max-width:900px){.kpi-grid{grid-template-columns:1fr}.section-title{font-size:1.45rem}.terms-heading{font-size:1.5rem}.kpi-value{font-size:1.72rem}}
-
-/* === WHITE DROPDOWN BOX FOR "Rank Top 25 by" === */
-div[data-testid="stSelectbox"] > div[data-baseweb="select"] {
-    background-color: #ffffff !important;
-    border: 2px solid #D8D1C5 !important;
-}
-
-div[data-testid="stSelectbox"] label {
-    color: #22251F !important;
-}
-
-/* Selected value text inside dropdown */
-div[data-testid="stSelectbox"] span[data-baseweb="select__single-value"] {
-    color: #22251F !important;
-}
-
-/* Dropdown options list */
-div[data-testid="stSelectbox"] div[role="listbox"] {
-    background-color: #ffffff !important;
-}
-</style>""", unsafe_allow_html=True)
+.section-card{background:#fff;border:1px solid #DED9D0;border-radius:16px;padding:20px;margin:18px 0 0;box-shadow:0 6px 18px rgba(37,46,39,.045)}
+.section-title{font-size:1.55rem;line-height:1.2;font-weight:900;color:#07513F}.section-note{font-size:.94rem;line-height:1.4;color:#596057;margin:5px 0 16px}
+.kpi-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}.kpi-card{display:flex;align-items:center;gap:16px;background:#fff;border:1px solid #DED9D0;border-left:4px solid #F2B51D;border-radius:11px;padding:16px 18px;min-height:112px}.kpi-icon{width:54px;height:54px;min-width:54px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:#FFF4D4;border:1px solid #F4D988;color:#C48700;font-size:1.7rem;font-weight:900}.kpi-copy{min-width:0}.kpi-label{color:#555B54;font-size:.82rem;font-weight:800}.kpi-value{color:#171A18;font-size:1.72rem;line-height:1.12;font-weight:900;margin-top:5px;white-space:nowrap}.kpi-sub{color:#596057;font-size:.82rem;margin-top:5px}
+.report-table-wrap{overflow:auto;border:1px solid #E3DDD2;border-radius:10px;background:#fff}table.report-table{border-collapse:collapse;width:100%;min-width:900px;font-size:.79rem;color:#22251F}table.report-table th{position:sticky;top:0;z-index:1;background:#07513F;color:#fff;font-weight:800;text-align:left;padding:9px 10px;border-bottom:1px solid #D8D1C5;white-space:nowrap}table.report-table td{background:#fff;color:#22251F;padding:8px 10px;border-bottom:1px solid #ECE7DF;white-space:nowrap}table.report-table tr:nth-child(even) td{background:#F8F7F4}table.report-table td.num,table.report-table th.num{text-align:right;font-variant-numeric:tabular-nums}.badge-red{color:#B42318;font-weight:800}.badge-green{color:#067647;font-weight:800}.badge-amber{color:#B54708;font-weight:800}.terms-heading{font-size:1.8rem;line-height:1.2;font-weight:900;color:#0B4A3A;margin:30px 0 14px}.terms-heading.credit-card{color:#D96B00}.empty-box{background:#EDF7ED;color:#286B35;padding:12px 14px;border-radius:8px;font-weight:650}
+[data-testid="stSidebar"] .gw-filter-heading{color:#F2B51D!important;font-size:.78rem;font-weight:900;letter-spacing:.08em;margin:.65rem 0 .2rem;text-transform:uppercase}
+[data-testid="stSidebar"] [data-testid="stSelectbox"]{margin-bottom:.18rem}
+[data-testid="stSidebar"] [data-testid="stSelectbox"] label{color:#fff!important;font-size:.78rem!important;font-weight:700!important;margin-bottom:.1rem!important}
+[data-testid="stSidebar"] [data-testid="stSelectbox"] div[data-baseweb="select"]>div{background:#fff!important;border:1px solid #D7D7D7!important;border-radius:7px!important;min-height:38px!important}
+[data-testid="stSidebar"] [data-testid="stSelectbox"] div[data-baseweb="select"] span,[data-testid="stSidebar"] [data-testid="stSelectbox"] div[data-baseweb="select"] div{color:#171A18!important;-webkit-text-fill-color:#171A18!important}
+[data-testid="stSidebar"] .stButton>button{width:100%!important;margin-top:.45rem!important}
+.ar-toolbar{display:flex;align-items:end;justify-content:space-between;gap:16px;margin:-2px 0 10px}.ar-toolbar-note{color:#596057;font-size:.86rem}
+@media(max-width:900px){.kpi-grid{grid-template-columns:1fr}.section-title{font-size:1.4rem}.terms-heading{font-size:1.5rem}.kpi-value{font-size:1.55rem}}
+</style>""",unsafe_allow_html=True)
 
 def money(value):
     try:
@@ -160,23 +148,29 @@ raw_df = prep_ar(pd.read_csv(options[selected]))
 channel_col = "Channel Clean" if "Channel Clean" in raw_df.columns else "Sales Channel: Name"
 df = raw_df.copy()
 
-st.sidebar.markdown("## AR Filters")
-for label, col in [
-    ("Customer", "Reporting Customer"), ("Channel", channel_col),
-    ("Sales Rep", "Sales Rep: Name"), ("Terms", "Terms: Name"),
-    ("Bucket", "Bucket"), ("Transaction Type", "Transaction Type"),
-    ("Deduction Type", "Deduction Type"),
-]:
-    df = apply_multiselect_filter(df, label, col)
+st.sidebar.markdown('<div class="gw-filter-heading">AR Filters</div>', unsafe_allow_html=True)
 
-search = st.sidebar.text_input("Search customer / memo / document")
-if search:
-    value = search.lower().strip()
-    mask = pd.Series(False, index=df.index)
-    for col in ["Reporting Customer", "Memo", "Document Number", "P.O. No."]:
-        if col in df.columns:
-            mask |= df[col].fillna("").astype(str).str.lower().str.contains(value, regex=False)
-    df = df[mask]
+filter_specs = [
+    ("Customer", "Reporting Customer", "ar_customer"),
+    ("Channel", channel_col, "ar_channel"),
+    ("Sales Rep", "Sales Rep: Name", "ar_sales_rep"),
+    ("Terms", "Terms: Name", "ar_terms"),
+    ("Aging Bucket", "Bucket", "ar_bucket"),
+]
+
+def reset_ar_filters():
+    for _, _, key in filter_specs:
+        st.session_state[key] = "All"
+
+for label, col, key in filter_specs:
+    if col not in df.columns:
+        continue
+    values = sorted(v for v in raw_df[col].fillna("Unknown").astype(str).str.strip().unique() if v)
+    choice = st.sidebar.selectbox(label, ["All", *values], key=key)
+    if choice != "All":
+        df = df[df[col].fillna("Unknown").astype(str).str.strip().eq(choice)]
+
+st.sidebar.button("↻  Clear Filters", key="clear_ar_filters", on_click=reset_ar_filters, use_container_width=True)
 
 for col in ["Open Balance", "Age"]:
     if col not in df.columns:
@@ -229,14 +223,16 @@ hold_source = invoice_rows[invoice_rows["Bucket"].isin(OVER_60_BUCKETS) & (invoi
 hold_customer_count = hold_source["Reporting Customer"].nunique()
 
 section_start("Executive Summary", "Key AR exposure and collection-risk indicators for the selected snapshot.")
+past_due_pct = (past_due / total_ar) if total_ar else 0
+ninety_pct = (over_90 / total_ar) if total_ar else 0
 st.markdown(
     '<div class="kpi-grid">' + ''.join([
-        f'<div class="kpi-card"><div class="kpi-label">Total AR</div><div class="kpi-value">{money(total_ar)}</div></div>',
-        f'<div class="kpi-card"><div class="kpi-label">Past Due</div><div class="kpi-value">{money(past_due)}</div></div>',
-        f'<div class="kpi-card"><div class="kpi-label">Invoice 90+</div><div class="kpi-value">{money(over_90)}</div></div>',
-        f'<div class="kpi-card"><div class="kpi-label">Suggested Holds</div><div class="kpi-value">{hold_customer_count:,}</div></div>',
-        f'<div class="kpi-card"><div class="kpi-label">Open Chargebacks</div><div class="kpi-value">{money(chargebacks)}</div></div>',
-        f'<div class="kpi-card"><div class="kpi-label">CB Recoveries</div><div class="kpi-value">{money(cb_recoveries)}</div></div>',
+        f'<div class="kpi-card"><div class="kpi-icon">$</div><div class="kpi-copy"><div class="kpi-label">Total AR</div><div class="kpi-value">{money(total_ar)}</div><div class="kpi-sub">100% of Total AR</div></div></div>',
+        f'<div class="kpi-card"><div class="kpi-icon">◷</div><div class="kpi-copy"><div class="kpi-label">Past Due</div><div class="kpi-value">{money(past_due)}</div><div class="kpi-sub">{past_due_pct:.2%} of Total AR</div></div></div>',
+        f'<div class="kpi-card"><div class="kpi-icon">▤</div><div class="kpi-copy"><div class="kpi-label">Invoice 90+</div><div class="kpi-value">{money(over_90)}</div><div class="kpi-sub">{ninety_pct:.2%} of Total AR</div></div></div>',
+        f'<div class="kpi-card"><div class="kpi-icon">◇</div><div class="kpi-copy"><div class="kpi-label">Suggested Holds</div><div class="kpi-value">{hold_customer_count:,}</div><div class="kpi-sub">Customers</div></div></div>',
+        f'<div class="kpi-card"><div class="kpi-icon">⌑</div><div class="kpi-copy"><div class="kpi-label">Open Chargebacks</div><div class="kpi-value">{money(chargebacks)}</div><div class="kpi-sub">{len(chargeback_rows):,} chargebacks</div></div></div>',
+        f'<div class="kpi-card"><div class="kpi-icon">↻</div><div class="kpi-copy"><div class="kpi-label">CB Recoveries</div><div class="kpi-value">{money(cb_recoveries)}</div><div class="kpi-sub">{len(recovery_rows):,} recoveries</div></div></div>',
     ]) + '</div>',
     unsafe_allow_html=True,
 )
@@ -263,17 +259,33 @@ for customer, group in df.groupby("Reporting Customer", dropna=False):
         "Customer": customer, "Total AR": group["Open Balance"].sum(), "Past Due": past_due_balance,
         "60+": bal_60, "90+": bal_90, "Chargebacks": cb["Open Balance"].sum(),
         "Oldest Invoice Days": oldest_age, "Next Due Date": date_display(next_due),
+        "Channel": first_nonblank(group[channel_col]),
         "Terms": first_nonblank(group["Terms: Name"]), "Sales Rep": first_nonblank(group["Sales Rep: Name"]),
         "Suggested Hold": "Yes" if suggested_hold else "No", "Status": "—", "Priority": priority, "Reason": reason,
     })
 customer_summary = pd.DataFrame(records)
 
 section_start("1. Top 25 Customer Exposure", "Customers ranked by the selected exposure measure.")
-sort_choice = st.selectbox("Rank Top 25 by", ["Past Due", "Total AR", "60+", "90+", "Chargebacks"], index=0)
-top_25 = customer_summary.sort_values(sort_choice, ascending=False).head(25)[[
-    "Customer", "Total AR", "Past Due", "60+", "90+", "Chargebacks", "Terms", "Sales Rep", "Suggested Hold", "Status", "Priority"
-]]
-render_table(top_25, money_cols=["Total AR", "Past Due", "60+", "90+", "Chargebacks"], max_height=760)
+left, right = st.columns([3, 1])
+with left:
+    sort_choice = st.selectbox("Rank By", ["Past Due", "Total AR", "60+", "90+", "Chargebacks"], index=0, key="ar_rank_by")
+with right:
+    export_source = customer_summary.sort_values(sort_choice, ascending=False).head(25)
+    st.download_button(
+        "⇩  Export CSV",
+        data=export_source.to_csv(index=False).encode("utf-8"),
+        file_name=f"AR_Top_25_{selected_as_of.replace('/', '-')}.csv",
+        mime="text/csv",
+        use_container_width=True,
+    )
+top_25 = export_source[["Customer", "Channel", "Sales Rep", "Terms", "Past Due", "Total AR"]].copy()
+top_25.insert(0, "Rank", range(1, len(top_25) + 1))
+top_25["% of Total AR"] = top_25["Total AR"].div(total_ar).fillna(0)
+st.dataframe(
+    top_25.style.format({"Past Due": "${:,.2f}", "Total AR": "${:,.2f}", "% of Total AR": "{:.2%}"}),
+    width="stretch", hide_index=True, height=min(760, max(160, 38 * (len(top_25) + 1))),
+    column_config={"Rank": st.column_config.NumberColumn("Rank", format="%d")},
+)
 section_end()
 
 section_start("2. Terms Priority", "Accounts requiring attention based on 5th MFI, 10th MFI, or credit-card terms.")
