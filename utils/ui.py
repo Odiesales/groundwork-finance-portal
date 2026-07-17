@@ -104,10 +104,60 @@ table{{background:#fff!important;color:var(--gw-charcoal)!important}} thead tr t
 [data-testid="stSelectbox"] div[data-baseweb="select"]>div,[data-testid="stMultiSelect"] div[data-baseweb="select"]>div,[data-testid="stTextInput"] div[data-baseweb="input"]{{background:#fff!important;color:#202020!important;border-color:#D5D0C7!important}}
 [data-testid="stSelectbox"] *,[data-testid="stMultiSelect"] *,[data-testid="stTextInput"] *{{color:#202020!important;-webkit-text-fill-color:#202020!important}}
 .stButton>button,.stDownloadButton>button{{background:var(--gw-yellow)!important;color:#171717!important;border:1px solid #D69D0F!important;font-weight:800!important;border-radius:8px!important;min-height:2.65rem!important}}.stButton>button:hover,.stDownloadButton>button:hover{{background:#E2A711!important;border-color:#C78E08!important;color:#111!important}}
-/* Keep all select fields readable, even when a browser restores dark form controls. */
-[data-testid="stSelectbox"] div[data-baseweb="select"]>div,[data-testid="stMultiSelect"] div[data-baseweb="select"]>div{{background:#fff!important;color:#171A18!important}}
-[data-testid="stSelectbox"] div[data-baseweb="select"] span,[data-testid="stSelectbox"] div[data-baseweb="select"] input,[data-testid="stMultiSelect"] div[data-baseweb="select"] span,[data-testid="stMultiSelect"] div[data-baseweb="select"] input{{color:#171A18!important;-webkit-text-fill-color:#171A18!important}}
-[data-testid="stSelectbox"] svg,[data-testid="stMultiSelect"] svg{{fill:#171A18!important;color:#171A18!important}}
+/* Force every Streamlit dropdown to remain a light control in all themes and browsers. */
+[data-testid="stSelectbox"],
+[data-testid="stMultiSelect"],
+div[data-baseweb="select"] {{color-scheme:light!important;}}
+[data-testid="stSelectbox"] div[data-baseweb="select"],
+[data-testid="stMultiSelect"] div[data-baseweb="select"],
+[data-testid="stSelectbox"] div[data-baseweb="select"] > div,
+[data-testid="stMultiSelect"] div[data-baseweb="select"] > div,
+[data-testid="stSelectbox"] [role="combobox"],
+[data-testid="stMultiSelect"] [role="combobox"] {{
+  background-color:#FFFFFF!important;
+  background:#FFFFFF!important;
+  color:#171A18!important;
+  -webkit-text-fill-color:#171A18!important;
+  border-color:#D5D0C7!important;
+  opacity:1!important;
+}}
+[data-testid="stSelectbox"] div[data-baseweb="select"] *,
+[data-testid="stMultiSelect"] div[data-baseweb="select"] *,
+[data-testid="stSelectbox"] [role="combobox"] *,
+[data-testid="stMultiSelect"] [role="combobox"] * {{
+  color:#171A18!important;
+  -webkit-text-fill-color:#171A18!important;
+  opacity:1!important;
+}}
+[data-testid="stSelectbox"] svg,
+[data-testid="stMultiSelect"] svg {{fill:#171A18!important;color:#171A18!important;}}
+/* BaseWeb renders the opened list outside the sidebar, so style the portal itself. */
+body > div[data-baseweb="popover"],
+div[data-baseweb="popover"],
+div[data-baseweb="menu"],
+ul[role="listbox"],
+[role="listbox"] {{
+  background:#FFFFFF!important;
+  background-color:#FFFFFF!important;
+  color:#171A18!important;
+  color-scheme:light!important;
+}}
+li[role="option"],
+div[role="option"],
+[role="listbox"] [role="option"] {{
+  background:#FFFFFF!important;
+  background-color:#FFFFFF!important;
+  color:#171A18!important;
+  -webkit-text-fill-color:#171A18!important;
+  opacity:1!important;
+}}
+li[role="option"] *,
+div[role="option"] *,
+[role="listbox"] [role="option"] * {{color:#171A18!important;-webkit-text-fill-color:#171A18!important;}}
+li[role="option"]:hover,
+div[role="option"]:hover,
+[role="listbox"] [role="option"]:hover,
+[role="option"][aria-selected="true"] {{background:#FFF3CF!important;background-color:#FFF3CF!important;}}
 @media(max-width:900px){{.gw-page-head{{display:block}}.gw-head-status{{margin-top:.8rem;text-align:left}}.gw-page-title{{font-size:2.15rem}}.gw-section-title{{font-size:1.45rem}}.gw-kpi-value{{font-size:1.72rem}}}}
 </style>""", unsafe_allow_html=True)
 
