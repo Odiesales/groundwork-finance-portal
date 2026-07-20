@@ -191,6 +191,21 @@ def weight_to_lbs(value):
     return None
 
 
+def unit_multiplier(value):
+    """Return the number of individual packages represented by one selling unit."""
+    if pd.isna(value):
+        return 1.0
+    if isinstance(value, (int, float)):
+        return max(float(value), 1.0)
+    text = str(value).strip().upper()
+    if not text:
+        return 1.0
+    match = re.search(r"CASE\s+OF\s+(\d+(?:\.\d+)?)", text)
+    if match:
+        return max(float(match.group(1)), 1.0)
+    return 1.0
+
+
 def clean_uploaded_revenue_report(uploaded_file):
     raw = read_table(uploaded_file, sheet_name=0).copy()
     raw.columns = [str(c).strip() for c in raw.columns]
@@ -205,14 +220,16 @@ def clean_uploaded_revenue_report(uploaded_file):
     customer_col = find_col(df, ["Top Level Parent", "Customer", "Reporting Customer"])
     rep_col = find_col(df, ["Sales Rep", "Sales Rep: Name"])
     class_col = find_col(df, ["Item Class", "Class"])
-    size_col = find_col(df, ["Roasted Coffee Size", "Coffee Size", "Size"])
+    size_col = find_col(df, ["Roasted Coffee Size", "Coffee Size", "Size", "Weight"])
     item_col = find_col(df, ["Memo", "Item", "Description"])
-    units_col = find_col(df, ["Sum of # of Units", "Units", "Quantity"])
+    quantity_col = find_col(df, ["Sum of Quantity", "Quantity", "Qty"])
+    unit_col = find_col(df, ["Unit", "Units Type", "Unit of Measure", "UOM"])
+    multiplier_col = find_col(df, ["Case Multiplier", "Unit Multiplier", "Units per Case", "Units Per Case"])
 
     if amount_col is None:
         raise ValueError("Could not find revenue amount column. Expected 'Sum of Amount (Credit)' or similar.")
 
-    out = pd.DataFrame()
+    out = pd.DataFrame(index=df.index)
     out["Date"] = pd.to_datetime(df[date_col], errors="coerce") if date_col else pd.NaT
     out["Week"] = df[week_col].astype(str) if week_col else out["Date"].dt.to_period("W").astype(str)
     out["Period"] = df[period_col].astype(str) if period_col else out["Date"].dt.to_period("M").astype(str)
@@ -224,21 +241,32 @@ def clean_uploaded_revenue_report(uploaded_file):
     out["Item / Memo"] = df[item_col].fillna("").astype(str) if item_col else ""
     out["Revenue"] = pd.to_numeric(df[amount_col], errors="coerce").fillna(0)
 
-    if lbs_col:
-        out["Lbs"] = pd.to_numeric(df[lbs_col], errors="coerce")
+    quantity = (
+        pd.to_numeric(df[quantity_col], errors="coerce").abs().fillna(1.0)
+        if quantity_col else pd.Series(1.0, index=df.index)
+    )
+    quantity = quantity.where(quantity.ne(0), 1.0)
+
+    if multiplier_col:
+        multiplier = pd.to_numeric(df[multiplier_col], errors="coerce").fillna(1.0)
+        multiplier = multiplier.where(multiplier.gt(0), 1.0)
+    elif unit_col:
+        multiplier = df[unit_col].apply(unit_multiplier)
     else:
-        out["Lbs"] = pd.NA
+        multiplier = pd.Series(1.0, index=df.index)
 
-    missing_lbs = out["Lbs"].isna() | out["Lbs"].eq(0)
-    if size_col:
-        parsed_lbs = df[size_col].apply(weight_to_lbs)
-        if units_col:
-            units = pd.to_numeric(df[units_col], errors="coerce").fillna(1)
-            parsed_lbs = parsed_lbs * units
-        out.loc[missing_lbs, "Lbs"] = parsed_lbs[missing_lbs]
+    package_lbs = (df[size_col].apply(weight_to_lbs) if size_col else pd.Series(pd.NA, index=df.index, dtype="object"))
+    package_lbs = pd.to_numeric(package_lbs, errors="coerce")
+    if lbs_col:
+        source_lbs = pd.to_numeric(df[lbs_col], errors="coerce")
+        package_lbs = package_lbs.fillna(source_lbs)
 
-    out["Lbs"] = pd.to_numeric(out["Lbs"], errors="coerce").fillna(0)
-    out["$/LB"] = out.apply(lambda r: r["Revenue"] / r["Lbs"] if r["Lbs"] else 0, axis=1)
+    out["Quantity"] = quantity
+    out["Unit"] = df[unit_col].fillna("").astype(str) if unit_col else ""
+    out["Unit Multiplier"] = multiplier
+    out["Package Lbs"] = package_lbs.fillna(0.0)
+    out["Lbs"] = (out["Package Lbs"] * out["Quantity"] * out["Unit Multiplier"]).fillna(0.0)
+    out["$/LB"] = out["Revenue"].div(out["Lbs"].replace(0, pd.NA)).fillna(0.0)
     out["Snapshot Date"] = date.today().isoformat()
     return out
 

@@ -158,6 +158,42 @@ li[role="option"]:hover,
 div[role="option"]:hover,
 [role="listbox"] [role="option"]:hover,
 [role="option"][aria-selected="true"] {{background:#FFF3CF!important;background-color:#FFF3CF!important;}}
+
+/* Final sidebar filter override: white labels on charcoal, dark values on white controls. */
+[data-testid="stSidebar"] [data-testid="stWidgetLabel"],
+[data-testid="stSidebar"] [data-testid="stWidgetLabel"] *,
+[data-testid="stSidebar"] [data-testid="stSelectbox"] > label,
+[data-testid="stSidebar"] [data-testid="stSelectbox"] > label *,
+[data-testid="stSidebar"] [data-testid="stMultiSelect"] > label,
+[data-testid="stSidebar"] [data-testid="stMultiSelect"] > label *,
+[data-testid="stSidebar"] [data-testid="stTextInput"] > label,
+[data-testid="stSidebar"] [data-testid="stTextInput"] > label * {{
+  color:#F8F5EE!important;
+  -webkit-text-fill-color:#F8F5EE!important;
+  opacity:1!important;
+  background:transparent!important;
+}}
+[data-testid="stSidebar"] [data-testid="stSelectbox"] [role="combobox"],
+[data-testid="stSidebar"] [data-testid="stMultiSelect"] [role="combobox"],
+[data-testid="stSidebar"] [data-testid="stTextInput"] input {{
+  background:#FFFFFF!important;
+  color:#171A18!important;
+  -webkit-text-fill-color:#171A18!important;
+  caret-color:#171A18!important;
+  opacity:1!important;
+}}
+[data-testid="stSidebar"] [data-testid="stSelectbox"] [role="combobox"] *,
+[data-testid="stSidebar"] [data-testid="stMultiSelect"] [role="combobox"] *,
+[data-testid="stSidebar"] [data-testid="stTextInput"] input::placeholder {{
+  color:#171A18!important;
+  -webkit-text-fill-color:#171A18!important;
+  opacity:1!important;
+}}
+[data-testid="stSidebar"] .gw-filter-heading {{
+  color:#F2B51D!important;
+  -webkit-text-fill-color:#F2B51D!important;
+  background:transparent!important;
+}}
 @media(max-width:900px){{.gw-page-head{{display:block}}.gw-head-status{{margin-top:.8rem;text-align:left}}.gw-page-title{{font-size:2.15rem}}.gw-section-title{{font-size:1.45rem}}.gw-kpi-value{{font-size:1.72rem}}}}
 </style>""", unsafe_allow_html=True)
 
