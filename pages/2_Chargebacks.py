@@ -105,6 +105,8 @@ if base.empty:
     st.warning('No records match the selected filters.')
     footer(); st.stop()
 
+show_rows = st.selectbox('Chart Rows', ['Top 10', 'Top 25', 'All'], index=0, key='cb_chart_rows')
+chart_limit = None if show_rows == 'All' else int(show_rows.split()[-1])
 selected_name = ', '.join(customer) if customer else 'All Customers'
 section(f'{selected_name} | Open Balance by Deduction Type', f'Balances as of {as_of:%B %d, %Y}' if as_of is not None else 'Current aging snapshot')
 
@@ -142,16 +144,22 @@ st.dataframe(matrix.style.format('${:,.2f}'), width='stretch', height=min(520, 7
 c1,c2 = st.columns([1,1], gap='large')
 with c1:
     section('Open Chargebacks by Customer', 'Largest customer exposures in the selected aging snapshot.')
-    top = base.groupby('Reporting Customer')['Open Balance'].sum().sort_values(ascending=False).head(10).sort_values()
-    fig = go.Figure(go.Bar(x=top.values, y=top.index, orientation='h', marker_color=YELLOW, text=[format_money(v,0) for v in top.values], textposition='outside'))
+    top = base.groupby('Reporting Customer')['Open Balance'].sum().sort_values(ascending=False)
+    if chart_limit is not None: top = top.head(chart_limit)
+    top = top.sort_values()
+    fig = go.Figure(go.Bar(x=top.values, y=top.index, orientation='h', marker_color=YELLOW, text=[format_money(v,0) for v in top.values], textposition='inside', insidetextanchor='middle'))
     fig.update_xaxes(tickformat='$,.0f')
     st.plotly_chart(chart_layout(fig, height=390), width='stretch')
 with c2:
     section('Open Balance by Deduction Type', 'Current balance distribution, not YTD activity.')
-    by_type = base.groupby('Deduction Type')['Open Balance'].sum().sort_values(ascending=False).head(12).sort_values()
-    fig = go.Figure(go.Bar(x=by_type.values, y=by_type.index, orientation='h', marker_color=YELLOW, text=[format_money(v,0) for v in by_type.values], textposition='outside'))
+    by_type = base.groupby('Deduction Type')['Open Balance'].sum().sort_values(ascending=False)
+    if chart_limit is not None: by_type = by_type.head(chart_limit)
+    by_type = by_type.sort_values()
+    fig = go.Figure(go.Bar(x=by_type.values, y=by_type.index, orientation='h', marker_color=YELLOW, text=[format_money(v,0) for v in by_type.values], textposition='inside', insidetextanchor='middle'))
     fig.update_xaxes(tickformat='$,.0f')
     st.plotly_chart(chart_layout(fig, height=390), width='stretch')
+
+st.download_button('⇩ Export Selected Chargebacks', base.to_csv(index=False).encode('utf-8'), f'Chargebacks_{as_of:%Y-%m-%d}.csv' if as_of is not None else 'Chargebacks.csv', 'text/csv')
 
 section('Chargeback Transactions (Detail)' if not view.startswith('Holdbacks') else 'Holdback Transactions (Detail)', 'Sortable detail supporting the balances above.')
 show_cols = [c for c in ['Date','Reporting Customer','Channel Clean','Transaction Type','Deduction Type','Document Number','Memo','Open Balance','Age','Bucket','Sales Rep: Name'] if c in base.columns]

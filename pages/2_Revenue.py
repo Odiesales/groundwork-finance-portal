@@ -470,6 +470,13 @@ with st.container(border=True):
 # -----------------------------------------------------------------------------
 # Weekly trends
 # -----------------------------------------------------------------------------
+section("Weekly Revenue Detail", "Numbers first: revenue, eligible pounds, weighted $/LB, orders, and customers by week.")
+weekly_display = weekly[["Week Start", "Revenue", "Lbs", "Weighted $/LB", "Orders", "Customers"]].copy().sort_values("Week Start", ascending=False)
+weekly_display["Week Of"] = weekly_display["Week Start"].dt.strftime("%b %d, %Y")
+weekly_display = weekly_display[["Week Of", "Revenue", "Lbs", "Weighted $/LB", "Orders", "Customers"]]
+st.download_button("⇩ Export Weekly Revenue", weekly_display.to_csv(index=False).encode("utf-8"), "Weekly_Revenue.csv", "text/csv")
+st.dataframe(style_revenue_table(weekly_display), width="stretch", hide_index=True)
+
 section("Wholesale Sales by Week", "Revenue trend through the selected reporting week.")
 st.plotly_chart(revenue_trend_chart(weekly), width='stretch')
 
@@ -518,7 +525,7 @@ if not retail_trend.empty:
     retail_pivot = retail_pivot.loc[:, top_locations]
     section("Retail: By Location", "Weekly revenue for the leading retail locations.")
     st.plotly_chart(
-        line_chart(retail_pivot, "Top Retail Locations — Weekly Revenue", "Revenue", currency=True),
+        line_chart(retail_pivot, "", "Revenue", currency=True),
         width='stretch',
     )
 
@@ -538,7 +545,7 @@ if not rep_source.empty:
     )
     section("Sales by Sales Representative", "Weekly revenue trends for the top five sales representatives.")
     st.plotly_chart(
-        line_chart(rep_revenue, "Top 5 Sales Representatives — Weekly Revenue", "Revenue", currency=True),
+        line_chart(rep_revenue, "", "Revenue", currency=True),
         width='stretch',
     )
 
@@ -556,7 +563,7 @@ if not rep_source.empty:
         rep_lb_pivot = rep_lb.pivot(index="Week Start", columns="Sales Rep", values="Weighted $/LB").fillna(0)
         section("$/LB by Sales Representative", "Weighted weekly pricing for the top five representatives using eligible non-retail pounds.")
         st.plotly_chart(
-            line_chart(rep_lb_pivot, "Top 5 Sales Representatives — Weighted $/LB", "Weighted $/LB", currency=True),
+            line_chart(rep_lb_pivot, "", "Weighted $/LB", currency=True),
             width='stretch',
         )
 
@@ -578,6 +585,8 @@ with right:
         width='stretch',
         hide_index=True,
     )
+
+st.download_button("⇩ Export Selected Week Detail", selected_df.to_csv(index=False).encode("utf-8"), f"Revenue_{selected_week:%Y-%m-%d}.csv", "text/csv")
 
 section("Selected Week: Product / Item Pricing")
 st.dataframe(

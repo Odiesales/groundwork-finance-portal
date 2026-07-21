@@ -137,16 +137,29 @@ if not options:
     st.info("Upload and save an AR snapshot in Admin first.")
     st.stop()
 
-selected = st.sidebar.selectbox("As of Date", list(options.keys()))
+selected_labels = list(options.keys())
+selected = st.sidebar.selectbox("As of Date", selected_labels, key="ar_as_of")
+selected_index = selected_labels.index(selected)
+compare_default = min(selected_index + 1, len(selected_labels) - 1)
+compare_selected = st.sidebar.selectbox(
+    "Compare Against",
+    selected_labels,
+    index=compare_default,
+    key="ar_compare_as_of",
+    disabled=len(selected_labels) < 2,
+)
 selected_as_of = selected.replace("As of ", "")
+compare_as_of = compare_selected.replace("As of ", "")
 
 page_header(
     "Accounts Receivable",
     f"AR aging, collection priorities, chargebacks, and customer exposure as of {selected_as_of}.",
     snapshot_date=pd.to_datetime(selected_as_of, errors="coerce"),
+    compared_date=pd.to_datetime(compare_as_of, errors="coerce") if compare_selected != selected else None,
 )
 
 raw_df = prep_ar(pd.read_csv(options[selected]))
+compare_raw_df = prep_ar(pd.read_csv(options[compare_selected])) if compare_selected != selected else pd.DataFrame()
 channel_col = "Channel Clean" if "Channel Clean" in raw_df.columns else "Sales Channel: Name"
 df = raw_df.copy()
 
@@ -230,14 +243,48 @@ cb_recoveries = abs(recovery_rows["Open Balance"].sum())
 hold_source = invoice_rows[invoice_rows["Bucket"].isin(OVER_60_BUCKETS) & (invoice_rows["Open Balance"] > 0)]
 hold_customer_count = hold_source["Reporting Customer"].nunique()
 
+def snapshot_metric_values(frame):
+    if frame is None or frame.empty:
+        return None
+    work = frame.copy()
+    work["Open Balance"] = pd.to_numeric(work.get("Open Balance", 0), errors="coerce").fillna(0)
+    work["Bucket"] = work.get("Bucket", "Unknown").fillna("Unknown").astype(str).str.strip()
+    transaction = work.get("Transaction Type", "").fillna("").astype(str).str.casefold()
+    deduction = work.get("Deduction Type", "").fillna("").astype(str).str.casefold()
+    cb_mask = transaction.str.contains("chargeback", na=False)
+    credit_mask = transaction.str.contains("credit", na=False)
+    payment_mask = transaction.str.contains("payment", na=False)
+    invoice_mask = ~(cb_mask | credit_mask | payment_mask) & ~deduction.eq("holdback")
+    recovery_mask = cb_mask & deduction.isin({"duplicate pmt", "overpayment", "pmt transfer", "on account payment (oap)"})
+    return {
+        "Total AR": float(work["Open Balance"].sum()),
+        "Past Due": float(work.loc[invoice_mask & work["Bucket"].isin(PAST_DUE_BUCKETS), "Open Balance"].sum()),
+        "Invoice 90+": float(work.loc[invoice_mask & work["Bucket"].isin(OVER_90_BUCKETS), "Open Balance"].sum()),
+        "Open Chargebacks": float(work.loc[cb_mask, "Open Balance"].sum()),
+        "CB Recoveries": float(abs(work.loc[recovery_mask, "Open Balance"].sum())),
+    }
+
+def wow_text(current, prior, inverse=False):
+    if prior is None:
+        return "No prior snapshot"
+    change = current - prior
+    direction = "▲" if change > 0 else "▼" if change < 0 else "—"
+    good = change < 0 if inverse else change > 0
+    css = "#067647" if good else "#B42318" if change else "#596057"
+    pct = (change / abs(prior)) if prior else None
+    pct_text = f" ({pct:+.1%})" if pct is not None else ""
+    return f'<span style="color:{css};font-weight:800">{direction} {money(abs(change))}{pct_text} WoW</span>'
+
+comparison_metrics = snapshot_metric_values(compare_raw_df)
+
 section_start("Executive Summary", "Key AR exposure and collection-risk indicators for the selected snapshot.")
 past_due_pct = (past_due / total_ar) if total_ar else 0
 ninety_pct = (over_90 / total_ar) if total_ar else 0
 st.markdown(
     '<div class="kpi-grid">' + ''.join([
-        f'<div class="kpi-card"><div class="kpi-icon">$</div><div class="kpi-copy"><div class="kpi-label">Total AR</div><div class="kpi-value">{money(total_ar)}</div><div class="kpi-sub">100% of Total AR</div></div></div>',
-        f'<div class="kpi-card"><div class="kpi-icon">◷</div><div class="kpi-copy"><div class="kpi-label">Past Due</div><div class="kpi-value">{money(past_due)}</div><div class="kpi-sub">{past_due_pct:.2%} of Total AR</div></div></div>',
-        f'<div class="kpi-card"><div class="kpi-icon">▤</div><div class="kpi-copy"><div class="kpi-label">Invoice 90+</div><div class="kpi-value">{money(over_90)}</div><div class="kpi-sub">{ninety_pct:.2%} of Total AR</div></div></div>',
+        f'<div class="kpi-card"><div class="kpi-icon">$</div><div class="kpi-copy"><div class="kpi-label">Total AR</div><div class="kpi-value">{money(total_ar)}</div><div class="kpi-sub">{wow_text(total_ar, comparison_metrics["Total AR"] if comparison_metrics else None, inverse=True)}</div></div></div>',
+        f'<div class="kpi-card"><div class="kpi-icon">◷</div><div class="kpi-copy"><div class="kpi-label">Past Due</div><div class="kpi-value">{money(past_due)}</div><div class="kpi-sub">{past_due_pct:.2%} of AR • {wow_text(past_due, comparison_metrics["Past Due"] if comparison_metrics else None, inverse=True)}</div></div></div>',
+        f'<div class="kpi-card"><div class="kpi-icon">▤</div><div class="kpi-copy"><div class="kpi-label">Invoice 90+</div><div class="kpi-value">{money(over_90)}</div><div class="kpi-sub">{ninety_pct:.2%} of AR • {wow_text(over_90, comparison_metrics["Invoice 90+"] if comparison_metrics else None, inverse=True)}</div></div></div>',
         f'<div class="kpi-card"><div class="kpi-icon">◇</div><div class="kpi-copy"><div class="kpi-label">Suggested Holds</div><div class="kpi-value">{hold_customer_count:,}</div><div class="kpi-sub">Customers</div></div></div>',
         f'<div class="kpi-card"><div class="kpi-icon">⌑</div><div class="kpi-copy"><div class="kpi-label">Open Chargebacks</div><div class="kpi-value">{money(chargebacks)}</div><div class="kpi-sub">{len(chargeback_rows):,} chargebacks</div></div></div>',
         f'<div class="kpi-card"><div class="kpi-icon">↻</div><div class="kpi-copy"><div class="kpi-label">CB Recoveries</div><div class="kpi-value">{money(cb_recoveries)}</div><div class="kpi-sub">{len(recovery_rows):,} recoveries</div></div></div>',
@@ -279,24 +326,23 @@ CUSTOMER_SUMMARY_COLUMNS = [
 customer_summary = pd.DataFrame(records, columns=CUSTOMER_SUMMARY_COLUMNS)
 
 section_start("1. Top 25 Customer Exposure", "Customers ranked by the selected exposure measure.")
-left, right = st.columns([3, 1])
-with left:
+c_rank, c_show, c_export = st.columns([2.2, 1.2, 1])
+with c_rank:
     sort_choice = st.selectbox("Rank By", ["Past Due", "Total AR", "60+", "90+", "Chargebacks"], index=0, key="ar_rank_by")
-with right:
-    export_source = customer_summary.sort_values(sort_choice, ascending=False).head(25)
-    st.download_button(
-        "⇩  Export CSV",
-        data=export_source.to_csv(index=False).encode("utf-8"),
-        file_name=f"AR_Top_25_{selected_as_of.replace('/', '-')}.csv",
-        mime="text/csv",
-        use_container_width=True,
-    )
-top_25 = export_source[["Customer", "Channel", "Sales Rep", "Terms", "Past Due", "Total AR"]].copy()
-top_25.insert(0, "Rank", range(1, len(top_25) + 1))
-top_25["% of Total AR"] = top_25["Total AR"].div(total_ar).fillna(0)
+with c_show:
+    show_choice = st.selectbox("Show", ["Top 25", "Top 50", "All"], key="ar_exposure_show")
+limit = None if show_choice == "All" else int(show_choice.split()[-1])
+export_source = customer_summary.sort_values(sort_choice, ascending=False)
+if limit is not None:
+    export_source = export_source.head(limit)
+with c_export:
+    st.download_button("⇩ Export CSV", export_source.to_csv(index=False).encode("utf-8"), f"AR_Customer_Exposure_{selected_as_of.replace('/', '-')}.csv", "text/csv", use_container_width=True)
+exposure_table = export_source[["Customer", "Channel", "Sales Rep", "Terms", "Past Due", "Total AR"]].copy()
+exposure_table.insert(0, "Rank", range(1, len(exposure_table) + 1))
+exposure_table["% of Total AR"] = exposure_table["Total AR"].div(total_ar).fillna(0)
 st.dataframe(
-    top_25.style.format({"Past Due": "${:,.2f}", "Total AR": "${:,.2f}", "% of Total AR": "{:.2%}"}),
-    width="stretch", hide_index=True, height=min(760, max(160, 38 * (len(top_25) + 1))),
+    exposure_table.style.format({"Past Due": "${:,.2f}", "Total AR": "${:,.2f}", "% of Total AR": "{:.2%}"}),
+    width="stretch", hide_index=True, height=min(760, max(160, 38 * (len(exposure_table) + 1))),
     column_config={"Rank": st.column_config.NumberColumn("Rank", format="%d")},
 )
 section_end()
@@ -321,8 +367,10 @@ section_start(
     f"3. Suggested Credit Holds ({len(hold_table):,} Customers | {money(hold_table['60+'].sum())} Exposure)",
     "Positive invoice balances in the 61-90 or 91+ buckets. Chargebacks and holdbacks are excluded.",
 )
+hold_export = hold_table[["Customer", "60+", "90+", "Past Due", "Oldest Invoice Days", "Terms", "Sales Rep", "Status", "Reason"]].copy()
+st.download_button("⇩ Export Suggested Holds", hold_export.to_csv(index=False).encode("utf-8"), f"AR_Suggested_Holds_{selected_as_of.replace('/', '-')}.csv", "text/csv")
 render_table(
-    hold_table[["Customer", "60+", "90+", "Past Due", "Oldest Invoice Days", "Terms", "Sales Rep", "Status", "Reason"]].head(50),
+    hold_export.head(50),
     money_cols=["60+", "90+", "Past Due"], integer_cols=["Oldest Invoice Days"], max_height=530,
 )
 section_end()
@@ -332,8 +380,10 @@ section_start(
     f"4. Collection Priority ({money(collection_table['Past Due'].sum())} Past Due)",
     "Customers ranked by past-due invoice exposure, 90+ balance, and oldest invoice.",
 )
+collection_export = collection_table[["Customer", "Past Due", "60+", "90+", "Oldest Invoice Days", "Terms", "Sales Rep", "Priority"]].copy()
+st.download_button("⇩ Export Collection Priority", collection_export.to_csv(index=False).encode("utf-8"), f"AR_Collection_Priority_{selected_as_of.replace('/', '-')}.csv", "text/csv")
 render_table(
-    collection_table[["Customer", "Past Due", "60+", "90+", "Oldest Invoice Days", "Terms", "Sales Rep", "Priority"]].head(50),
+    collection_export.head(50),
     money_cols=["Past Due", "60+", "90+"], integer_cols=["Oldest Invoice Days"], max_height=560,
 )
 section_end()
@@ -341,6 +391,7 @@ section_end()
 section_start("5. Chargeback Center", "Open chargebacks, recoveries, and largest chargeback exposures.")
 cb_customers = chargeback_rows.groupby("Reporting Customer", dropna=False)["Open Balance"].sum().sort_values(ascending=False).head(25).reset_index()
 cb_customers = cb_customers.rename(columns={"Reporting Customer": "Customer", "Open Balance": "Chargebacks"})
+st.download_button("⇩ Export Chargeback Center", cb_customers.to_csv(index=False).encode("utf-8"), f"AR_Chargeback_Center_{selected_as_of.replace('/', '-')}.csv", "text/csv")
 render_table(cb_customers, money_cols=["Chargebacks"], max_height=430)
 section_end()
 
