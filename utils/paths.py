@@ -11,6 +11,7 @@ ASSETS_DIR = BASE_DIR / "assets"
 
 CURRENT_AR_PATH = EXPORT_DIR / "current_ar_clean.csv"
 CURRENT_REVENUE_PATH = EXPORT_DIR / "current_revenue_clean.csv"
+REVENUE_HISTORY_PATH = EXPORT_DIR / "revenue_history.csv"
 
 for folder in [UPLOAD_DIR, EXPORT_DIR, AR_SNAPSHOT_DIR, REVENUE_SNAPSHOT_DIR, ASSETS_DIR]:
     folder.mkdir(parents=True, exist_ok=True)

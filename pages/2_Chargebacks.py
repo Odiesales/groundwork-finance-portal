@@ -61,29 +61,27 @@ view = st.sidebar.radio(
 )
 filter_source = holdbacks if view.startswith('Holdbacks') else chargebacks
 
-customers = ['All Customers'] + sorted(filter_source['Reporting Customer'].dropna().astype(str).unique().tolist())
-customer = st.sidebar.selectbox('Customer', customers)
+customers = sorted(filter_source['Reporting Customer'].dropna().astype(str).unique().tolist())
+customer = st.sidebar.multiselect('Customer', customers)
 
-deductions = ['All Deduction Types'] + sorted(
-    x for x in filter_source['Deduction Type'].dropna().astype(str).unique() if x
-)
-deduction = st.sidebar.selectbox('Deduction Type', deductions)
+deductions = sorted(x for x in filter_source['Deduction Type'].dropna().astype(str).unique() if x)
+deduction = st.sidebar.multiselect('Deduction Type', deductions)
 
-channels = ['All Channels'] + sorted(filter_source['Channel Clean'].dropna().astype(str).unique().tolist())
-channel = st.sidebar.selectbox('Channel', channels)
+channels = sorted(filter_source['Channel Clean'].dropna().astype(str).unique().tolist())
+channel = st.sidebar.multiselect('Channel', channels)
 
-reps = ['All Sales Reps'] + sorted(filter_source['Sales Rep: Name'].dropna().astype(str).unique().tolist())
-rep = st.sidebar.selectbox('Sales Rep', reps)
+reps = sorted(filter_source['Sales Rep: Name'].dropna().astype(str).unique().tolist())
+rep = st.sidebar.multiselect('Sales Rep', reps)
 
-buckets = ['All Buckets'] + sorted(filter_source['Bucket'].dropna().astype(str).unique().tolist())
-bucket = st.sidebar.selectbox('Bucket', buckets)
+buckets = sorted(filter_source['Bucket'].dropna().astype(str).unique().tolist())
+bucket = st.sidebar.multiselect('Bucket', buckets)
 
 base = filter_source.copy()
-if customer != 'All Customers': base = base[base['Reporting Customer'].astype(str).eq(customer)]
-if deduction != 'All Deduction Types': base = base[base['Deduction Type'].eq(deduction)]
-if channel != 'All Channels': base = base[base['Channel Clean'].astype(str).eq(channel)]
-if rep != 'All Sales Reps': base = base[base['Sales Rep: Name'].astype(str).eq(rep)]
-if bucket != 'All Buckets': base = base[base['Bucket'].astype(str).eq(bucket)]
+if customer: base = base[base['Reporting Customer'].astype(str).isin(customer)]
+if deduction: base = base[base['Deduction Type'].isin(deduction)]
+if channel: base = base[base['Channel Clean'].astype(str).isin(channel)]
+if rep: base = base[base['Sales Rep: Name'].astype(str).isin(rep)]
+if bucket: base = base[base['Bucket'].astype(str).isin(bucket)]
 
 if view.startswith('Holdbacks'):
     section('Open Holdbacks', 'Holdbacks are classified as Invoice with Deduction Type = Holdback and are excluded from chargeback totals.')
@@ -107,7 +105,7 @@ if base.empty:
     st.warning('No records match the selected filters.')
     footer(); st.stop()
 
-selected_name = customer if customer != 'All Customers' else 'All Customers'
+selected_name = ', '.join(customer) if customer else 'All Customers'
 section(f'{selected_name} | Open Balance by Deduction Type', f'Balances as of {as_of:%B %d, %Y}' if as_of is not None else 'Current aging snapshot')
 
 # Snapshot matrix. If history exists, display one column per saved snapshot; otherwise current As Of only.
@@ -123,11 +121,11 @@ if not hist.empty:
         hist['Bucket'] = 'Unknown'
     hist['Bucket'] = hist['Bucket'].fillna('Unknown').astype(str).str.strip().replace('', 'Unknown')
     hist = hist[hist['Transaction Type Normalized'].eq('chargeback')]
-    if customer != 'All Customers': hist = hist[hist['Reporting Customer'].astype(str).eq(customer)]
-    if channel != 'All Channels': hist = hist[hist['Channel Clean'].astype(str).eq(channel)]
-    if deduction != 'All Deduction Types': hist = hist[hist['Deduction Type'].eq(deduction)]
-    if rep != 'All Sales Reps': hist = hist[hist['Sales Rep: Name'].astype(str).eq(rep)]
-    if bucket != 'All Buckets': hist = hist[hist['Bucket'].astype(str).eq(bucket)]
+    if customer: hist = hist[hist['Reporting Customer'].astype(str).isin(customer)]
+    if channel: hist = hist[hist['Channel Clean'].astype(str).isin(channel)]
+    if deduction: hist = hist[hist['Deduction Type'].isin(deduction)]
+    if rep: hist = hist[hist['Sales Rep: Name'].astype(str).isin(rep)]
+    if bucket: hist = hist[hist['Bucket'].astype(str).isin(bucket)]
     hist['As Of'] = hist['Snapshot Date'].dt.strftime('%b-%y')
     matrix = pd.pivot_table(hist, index='Deduction Type', columns='As Of', values='Open Balance', aggfunc='sum', fill_value=0)
 else:

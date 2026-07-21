@@ -21,10 +21,12 @@ st.markdown("""<style>
 .kpi-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}.kpi-card{display:flex;align-items:center;gap:16px;background:#fff;border:1px solid #DED9D0;border-left:4px solid #F2B51D;border-radius:11px;padding:16px 18px;min-height:112px}.kpi-icon{width:54px;height:54px;min-width:54px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:#FFF4D4;border:1px solid #F4D988;color:#C48700;font-size:1.7rem;font-weight:900}.kpi-copy{min-width:0}.kpi-label{color:#555B54;font-size:.82rem;font-weight:800}.kpi-value{color:#171A18;font-size:1.72rem;line-height:1.12;font-weight:900;margin-top:5px;white-space:nowrap}.kpi-sub{color:#596057;font-size:.82rem;margin-top:5px}
 .report-table-wrap{overflow:auto;border:1px solid #E3DDD2;border-radius:10px;background:#fff}table.report-table{border-collapse:collapse;width:100%;min-width:900px;font-size:.79rem;color:#22251F}table.report-table th{position:sticky;top:0;z-index:1;background:#07513F;color:#fff;font-weight:800;text-align:left;padding:9px 10px;border-bottom:1px solid #D8D1C5;white-space:nowrap}table.report-table td{background:#fff;color:#22251F;padding:8px 10px;border-bottom:1px solid #ECE7DF;white-space:nowrap}table.report-table tr:nth-child(even) td{background:#F8F7F4}table.report-table td.num,table.report-table th.num{text-align:right;font-variant-numeric:tabular-nums}.badge-red{color:#B42318;font-weight:800}.badge-green{color:#067647;font-weight:800}.badge-amber{color:#B54708;font-weight:800}.terms-heading{font-size:1.8rem;line-height:1.2;font-weight:900;color:#0B4A3A;margin:30px 0 14px}.terms-heading.credit-card{color:#D96B00}.empty-box{background:#EDF7ED;color:#286B35;padding:12px 14px;border-radius:8px;font-weight:650}
 [data-testid="stSidebar"] .gw-filter-heading{color:#F2B51D!important;font-size:.78rem;font-weight:900;letter-spacing:.08em;margin:.65rem 0 .2rem;text-transform:uppercase}
-[data-testid="stSidebar"] [data-testid="stSelectbox"]{margin-bottom:.18rem}
-[data-testid="stSidebar"] [data-testid="stSelectbox"] label{color:#fff!important;font-size:.78rem!important;font-weight:700!important;margin-bottom:.1rem!important}
-[data-testid="stSidebar"] [data-testid="stSelectbox"] div[data-baseweb="select"]>div{background:#fff!important;border:1px solid #D7D7D7!important;border-radius:7px!important;min-height:38px!important}
-[data-testid="stSidebar"] [data-testid="stSelectbox"] div[data-baseweb="select"] span,[data-testid="stSidebar"] [data-testid="stSelectbox"] div[data-baseweb="select"] div{color:#171A18!important;-webkit-text-fill-color:#171A18!important}
+[data-testid="stSidebar"] [data-testid="stSelectbox"], [data-testid="stSidebar"] [data-testid="stMultiSelect"]{margin-bottom:.18rem}
+[data-testid="stSidebar"] [data-testid="stSelectbox"] label, [data-testid="stSidebar"] [data-testid="stMultiSelect"] label{color:#fff!important;font-size:.78rem!important;font-weight:700!important;margin-bottom:.1rem!important}
+[data-testid="stSidebar"] [data-testid="stSelectbox"] div[data-baseweb="select"]>div, [data-testid="stSidebar"] [data-testid="stMultiSelect"] div[data-baseweb="select"]>div{background:#fff!important;border:1px solid #D7D7D7!important;border-radius:7px!important;min-height:38px!important}
+[data-testid="stSidebar"] [data-testid="stSelectbox"] div[data-baseweb="select"] span,[data-testid="stSidebar"] [data-testid="stSelectbox"] div[data-baseweb="select"] div,[data-testid="stSidebar"] [data-testid="stMultiSelect"] div[data-baseweb="select"] span,[data-testid="stSidebar"] [data-testid="stMultiSelect"] div[data-baseweb="select"] div{color:#171A18!important;-webkit-text-fill-color:#171A18!important}
+[data-testid="stSidebar"] [data-testid="stMultiSelect"] span[data-baseweb="tag"]{background:#FFF1C2!important;border:1px solid #E3B42B!important}
+[data-testid="stSidebar"] [data-testid="stMultiSelect"] span[data-baseweb="tag"] span{color:#171A18!important;-webkit-text-fill-color:#171A18!important}
 [data-testid="stSidebar"] .stButton>button{width:100%!important;margin-top:.45rem!important}
 .ar-toolbar{display:flex;align-items:end;justify-content:space-between;gap:16px;margin:-2px 0 10px}.ar-toolbar-note{color:#596057;font-size:.86rem}
 @media(max-width:900px){.kpi-grid{grid-template-columns:1fr}.section-title{font-size:1.4rem}.terms-heading{font-size:1.5rem}.kpi-value{font-size:1.55rem}}
@@ -160,15 +162,21 @@ filter_specs = [
 
 def reset_ar_filters():
     for _, _, key in filter_specs:
-        st.session_state[key] = "All"
+        st.session_state[key] = []
 
 for label, col, key in filter_specs:
     if col not in df.columns:
         continue
     values = sorted(v for v in raw_df[col].fillna("Unknown").astype(str).str.strip().unique() if v)
-    choice = st.sidebar.selectbox(label, ["All", *values], key=key)
-    if choice != "All":
-        df = df[df[col].fillna("Unknown").astype(str).str.strip().eq(choice)]
+    choices = st.sidebar.multiselect(
+        label,
+        values,
+        key=key,
+        placeholder="All",
+    )
+    if choices:
+        normalized = df[col].fillna("Unknown").astype(str).str.strip()
+        df = df[normalized.isin(choices)]
 
 st.sidebar.button("↻  Clear Filters", key="clear_ar_filters", on_click=reset_ar_filters, use_container_width=True)
 
@@ -263,7 +271,12 @@ for customer, group in df.groupby("Reporting Customer", dropna=False):
         "Terms": first_nonblank(group["Terms: Name"]), "Sales Rep": first_nonblank(group["Sales Rep: Name"]),
         "Suggested Hold": "Yes" if suggested_hold else "No", "Status": "—", "Priority": priority, "Reason": reason,
     })
-customer_summary = pd.DataFrame(records)
+CUSTOMER_SUMMARY_COLUMNS = [
+    "Customer", "Total AR", "Past Due", "60+", "90+", "Chargebacks",
+    "Oldest Invoice Days", "Next Due Date", "Channel", "Terms", "Sales Rep",
+    "Suggested Hold", "Status", "Priority", "Reason",
+]
+customer_summary = pd.DataFrame(records, columns=CUSTOMER_SUMMARY_COLUMNS)
 
 section_start("1. Top 25 Customer Exposure", "Customers ranked by the selected exposure measure.")
 left, right = st.columns([3, 1])
