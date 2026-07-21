@@ -7,6 +7,21 @@ from utils.paths import (
     REVENUE_SNAPSHOT_DIR,
 )
 
+def ar_snapshot_files():
+    """Return saved AR snapshots as (snapshot_date, path), newest first."""
+    snapshots = []
+
+    if not AR_SNAPSHOT_DIR.exists():
+        return snapshots
+
+    for path in AR_SNAPSHOT_DIR.glob("ar_*.csv"):
+        date_text = path.stem.replace("ar_", "", 1)
+        snapshot_date = pd.to_datetime(date_text, errors="coerce")
+
+        if pd.notna(snapshot_date):
+            snapshots.append((snapshot_date.normalize(), path))
+
+    return sorted(snapshots, key=lambda item: item[0], reverse=True)
 
 def load_snapshots(folder, prefix):
     frames = []
