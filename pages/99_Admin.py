@@ -11,6 +11,10 @@ from utils.data import (
     revenue_week_values,
     revenue_week_label,
     revenue_week_table,
+    ar_snapshot_files,
+    ar_snapshot_table,
+    delete_ar_snapshots,
+    sync_current_ar_from_latest,
 )
 from utils.paths import CURRENT_AR_PATH, AR_SNAPSHOT_DIR
 from utils.ui import format_money, page_header, section, footer
@@ -47,13 +51,54 @@ with ar_tab:
             if st.button("Save AR Snapshot", type="primary", key="save_ar_snapshot"):
                 CURRENT_AR_PATH.parent.mkdir(parents=True, exist_ok=True)
                 AR_SNAPSHOT_DIR.mkdir(parents=True, exist_ok=True)
-                ar_df.to_csv(CURRENT_AR_PATH, index=False)
                 ar_df.to_csv(ar_target, index=False)
-                st.success("AR snapshot saved.")
+                sync_current_ar_from_latest()
+                st.success("AR snapshot saved. Existing historical snapshots were preserved.")
             st.download_button("Download Cleaned AR Excel", convert_df_to_excel(ar_df), "cleaned_ar_report.xlsx")
             st.dataframe(ar_df.head(200), width="stretch", hide_index=True)
         except Exception as exc:
             st.error(f"Could not process AR file: {exc}")
+
+    st.divider()
+    section("AR Snapshot Manager", "Review or delete selected AR snapshots. Revenue history and all unselected AR dates remain untouched.")
+    inventory = ar_snapshot_table()
+    if inventory.empty:
+        st.info("No dated AR snapshots are available to manage.")
+    else:
+        snapshot_dates = inventory["As of Date"].tolist()
+        delete_dates = st.multiselect(
+            "AR Snapshot Dates to Delete",
+            options=snapshot_dates,
+            format_func=lambda d: pd.Timestamp(d).strftime("%b %d, %Y"),
+            key="delete_ar_snapshot_dates",
+        )
+        confirm_ar_delete = st.checkbox(
+            "I understand only the selected AR snapshot date(s) will be permanently removed.",
+            key="confirm_ar_snapshot_delete",
+        )
+        if st.button(
+            "Delete Selected AR Snapshots",
+            disabled=not (delete_dates and confirm_ar_delete),
+            key="delete_ar_snapshots_button",
+        ):
+            deleted, latest = delete_ar_snapshots(delete_dates)
+            if deleted:
+                latest_text = pd.Timestamp(latest).strftime("%b %d, %Y") if latest is not None else "None remaining"
+                st.success(f"Deleted {len(deleted)} selected AR snapshot(s). Current snapshot is now {latest_text}.")
+                st.rerun()
+        st.dataframe(
+            inventory,
+            width="stretch",
+            hide_index=True,
+            column_config={
+                "As of Date": st.column_config.DateColumn("As of Date", format="MMM DD, YYYY"),
+                "Rows": st.column_config.NumberColumn("Rows", format="%d"),
+                "Customers": st.column_config.NumberColumn("Customers", format="%d"),
+                "Total AR": st.column_config.NumberColumn("Total AR", format="$%.2f"),
+                "Current": st.column_config.NumberColumn("Current", format="$%.2f"),
+                "Past Due": st.column_config.NumberColumn("Past Due", format="$%.2f"),
+            },
+        )
 
 with revenue_tab:
     history = load_revenue_history()

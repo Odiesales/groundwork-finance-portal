@@ -124,6 +124,68 @@ def revenue_week_table(df):
     return grouped.sort_values('Week Start', ascending=False).drop(columns=['Week Start'])
 
 
+
+
+def ar_snapshot_files():
+    """Return saved AR snapshot files ordered newest first."""
+    items = []
+    for path in AR_SNAPSHOT_DIR.glob("ar_*.csv"):
+        raw = path.stem.replace("ar_", "").replace("_", "-")
+        stamp = pd.to_datetime(raw, errors="coerce")
+        if pd.notna(stamp):
+            items.append((pd.Timestamp(stamp).normalize(), path))
+    return sorted(items, key=lambda item: item[0], reverse=True)
+
+
+def sync_current_ar_from_latest():
+    """Refresh current_ar_clean.csv from the newest remaining dated snapshot."""
+    snapshots = ar_snapshot_files()
+    CURRENT_AR_PATH.parent.mkdir(parents=True, exist_ok=True)
+    if not snapshots:
+        if CURRENT_AR_PATH.exists():
+            CURRENT_AR_PATH.unlink()
+        return None
+    latest_date, latest_path = snapshots[0]
+    pd.read_csv(latest_path).to_csv(CURRENT_AR_PATH, index=False)
+    return latest_date
+
+
+def delete_ar_snapshots(snapshot_dates):
+    """Delete only the selected dated AR snapshots, then resync the current file."""
+    wanted = {pd.Timestamp(value).normalize() for value in snapshot_dates}
+    deleted = []
+    for stamp, path in ar_snapshot_files():
+        if stamp in wanted and path.exists():
+            path.unlink()
+            deleted.append(stamp)
+    latest = sync_current_ar_from_latest()
+    return deleted, latest
+
+
+def ar_snapshot_table():
+    """Summarize every stored AR snapshot for safe review and deletion."""
+    rows = []
+    for stamp, path in ar_snapshot_files():
+        try:
+            frame = prep_ar(pd.read_csv(path))
+            balances = pd.to_numeric(frame.get("Open Balance", 0), errors="coerce").fillna(0)
+            buckets = frame.get("Bucket", pd.Series("Unknown", index=frame.index)).fillna("Unknown").astype(str).str.strip()
+            current = float(balances[buckets.str.casefold().eq("current")].sum())
+            total = float(balances.sum())
+            rows.append({
+                "As of Date": stamp,
+                "Rows": len(frame),
+                "Customers": frame.loc[balances.ne(0), "Reporting Customer"].nunique(),
+                "Total AR": total,
+                "Current": current,
+                "Past Due": total - current,
+                "File": path.name,
+            })
+        except Exception:
+            rows.append({"As of Date": stamp, "Rows": 0, "Customers": 0, "Total AR": 0.0, "Current": 0.0, "Past Due": 0.0, "File": path.name})
+    return pd.DataFrame(rows)
+
+
 def load_ar_history(include_current=True):
     history = load_snapshots(AR_SNAPSHOT_DIR, 'ar')
     if history.empty and include_current and CURRENT_AR_PATH.exists():

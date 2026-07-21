@@ -2,6 +2,7 @@ import pandas as pd
 import streamlit as st
 
 from utils.paths import CURRENT_AR_PATH
+from utils.data import ar_snapshot_files
 from utils.ui import inject_global_css, sidebar_snapshot
 
 st.set_page_config(
@@ -12,6 +13,9 @@ st.set_page_config(
 )
 
 def current_snapshot_date():
+    snapshots = ar_snapshot_files()
+    if snapshots:
+        return snapshots[0][0]
     try:
         if CURRENT_AR_PATH.exists():
             df = pd.read_csv(CURRENT_AR_PATH, usecols=lambda c: c == "Snapshot Date")

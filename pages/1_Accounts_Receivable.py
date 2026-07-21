@@ -65,11 +65,16 @@ def snapshot_options():
         if date is not None:
             dated.append((date, path))
     dated.sort(reverse=True)
-    if CURRENT_AR_PATH.exists():
-        current_date = dated[0][0] if dated else pd.Timestamp.fromtimestamp(CURRENT_AR_PATH.stat().st_mtime)
-        options[f"As of {current_date.strftime('%m/%d/%y')}"] = CURRENT_AR_PATH
     for snapshot_date, path in dated:
-        options.setdefault(f"As of {snapshot_date.strftime('%m/%d/%y')}", path)
+        options[f"As of {snapshot_date.strftime('%m/%d/%y')}"] = path
+    if not options and CURRENT_AR_PATH.exists():
+        try:
+            current = prep_ar(pd.read_csv(CURRENT_AR_PATH))
+            dates = pd.to_datetime(current.get("Snapshot Date"), errors="coerce").dropna()
+            current_date = dates.max() if not dates.empty else pd.Timestamp.fromtimestamp(CURRENT_AR_PATH.stat().st_mtime)
+        except Exception:
+            current_date = pd.Timestamp.fromtimestamp(CURRENT_AR_PATH.stat().st_mtime)
+        options[f"As of {current_date.strftime('%m/%d/%y')}"] = CURRENT_AR_PATH
     return options
 
 
