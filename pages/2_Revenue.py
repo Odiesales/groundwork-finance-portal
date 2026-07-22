@@ -20,7 +20,7 @@ from utils.ui import (
 
 page_header(
     "Weekly Revenue Report",
-    "Weekly revenue, roasted-coffee pounds, weighted $/LB, channel performance, and sales trends.",
+    "Weekly revenue, roasted-coffee pounds, average and weighted $/LB, channel performance, and sales trends.",
     badge="Weekly Upload",
 )
 
@@ -130,13 +130,16 @@ def weekly_summary(frame: pd.DataFrame) -> pd.DataFrame:
         frame.groupby("Week Start", as_index=False)
         .agg(
             Revenue=("Revenue", "sum"),
+            Roasted_Revenue=("Eligible Revenue", "sum"),
             Lbs=("Eligible Lbs", "sum"),
             Eligible_Revenue=("Eligible Revenue", "sum"),
+            Average_Dollar_Per_Lb=("Average $/LB Row", "mean"),
             Orders=("Document Number", "nunique"),
             Customers=("Customer", "nunique"),
         )
         .sort_values("Week Start")
     )
+    grouped["Average $/LB"] = grouped["Average_Dollar_Per_Lb"].fillna(0.0)
     grouped["Weighted $/LB"] = grouped["Eligible_Revenue"].div(
         grouped["Lbs"].replace(0, pd.NA)
     ).fillna(0.0)
@@ -174,29 +177,61 @@ def _base_layout(height: int = 410) -> dict:
 def combo_chart(summary: pd.DataFrame, title: str = "") -> go.Figure:
     fig = go.Figure()
     fig.add_bar(
-        x=summary["Week Label"], y=summary["Revenue"], name="Revenue",
+        x=summary["Week Label"],
+        y=summary["Roasted_Revenue"],
+        name="Invoiced Sales",
         marker_color="#155b49",
-        hovertemplate="%{x}<br>Revenue: $%{y:,.2f}<extra></extra>",
+        hovertemplate="%{x}<br>Invoiced Sales: $%{y:,.2f}<extra></extra>",
     )
     fig.add_trace(go.Scatter(
-        x=summary["Week Label"], y=summary["Lbs"], name="Eligible Lbs",
-        mode="lines+markers", yaxis="y2",
-        line=dict(color="#d7a928", width=2.4), marker=dict(size=6),
-        hovertemplate="%{x}<br>Eligible Lbs: %{y:,.1f}<extra></extra>",
+        x=summary["Week Label"],
+        y=summary["Lbs"],
+        name="Lbs (Qty)",
+        mode="lines+markers",
+        line=dict(color="#1aa6d9", width=2.4),
+        marker=dict(size=6),
+        hovertemplate="%{x}<br>Lbs: %{y:,.1f}<extra></extra>",
     ))
     fig.add_trace(go.Scatter(
-        x=summary["Week Label"], y=summary["Weighted $/LB"], name="Weighted $/LB",
-        mode="lines+markers", yaxis="y3",
-        line=dict(color="#2f7dbd", width=2.4), marker=dict(size=6),
+        x=summary["Week Label"],
+        y=summary["Average $/LB"],
+        name="$/LB (Average)",
+        mode="lines+markers",
+        yaxis="y2",
+        line=dict(color="#f2b400", width=2.6),
+        marker=dict(size=6),
+        hovertemplate="%{x}<br>Average $/LB: $%{y:,.2f}<extra></extra>",
+    ))
+    fig.add_trace(go.Scatter(
+        x=summary["Week Label"],
+        y=summary["Weighted $/LB"],
+        name="$/LB (Weighted)",
+        mode="lines+markers",
+        yaxis="y2",
+        line=dict(color="#e31a1c", width=2.6),
+        marker=dict(size=6),
         hovertemplate="%{x}<br>Weighted $/LB: $%{y:,.2f}<extra></extra>",
     ))
-    layout = _base_layout(420)
+    layout = _base_layout(455)
     layout.update(
         title=dict(text=title, x=0.01, xanchor="left", font=dict(size=14)) if title else None,
         barmode="group",
-        yaxis=dict(title="Revenue", tickprefix="$", tickformat="~s", gridcolor="#e8eeea", zeroline=False),
-        yaxis2=dict(title="Eligible Lbs", overlaying="y", side="right", showgrid=False, position=0.92, tickformat="~s"),
-        yaxis3=dict(title="$/LB", overlaying="y", side="right", showgrid=False, anchor="free", position=1.0, tickprefix="$", tickformat=".2f"),
+        yaxis=dict(
+            title="Invoiced Sales / Lbs",
+            tickprefix="$",
+            tickformat="~s",
+            gridcolor="#e8eeea",
+            zeroline=False,
+        ),
+        yaxis2=dict(
+            title="$/LB",
+            overlaying="y",
+            side="right",
+            showgrid=False,
+            tickprefix="$",
+            tickformat=".2f",
+            rangemode="tozero",
+        ),
     )
     fig.update_layout(**layout)
     return fig
@@ -360,15 +395,26 @@ if df.empty:
     footer()
     st.stop()
 
-# Retail is intentionally excluded from pounds and $/LB. Revenue is only included
-# in the $/LB numerator where an eligible, non-retail row carries positive pounds.
+# Match the CFO report: the pounds and both $/LB measures are based only on
+# Finished Goods: Roasted Coffee rows with positive pounds. Retail/cafe rows are
+# excluded. Average $/LB is the simple average of the underlying row-level rates;
+# weighted $/LB is total eligible revenue divided by total eligible pounds.
 retail_mask = (
     df["Sales Channel"].str.contains("retail|cafe|café", case=False, regex=True, na=False)
     | df["Item Class"].str.contains("retail", case=False, regex=False, na=False)
 )
-eligible_lb_mask = (~retail_mask) & (df["Lbs"] > 0)
+roasted_coffee_mask = df["Item Class"].str.contains(
+    r"finished goods\s*:\s*roasted coffee",
+    case=False,
+    regex=True,
+    na=False,
+)
+eligible_lb_mask = roasted_coffee_mask & (~retail_mask) & (df["Lbs"] > 0)
 df["Eligible Lbs"] = df["Lbs"].where(eligible_lb_mask, 0.0)
 df["Eligible Revenue"] = df["Revenue"].where(eligible_lb_mask, 0.0)
+df["Average $/LB Row"] = df["Eligible Revenue"].div(
+    df["Eligible Lbs"].replace(0, pd.NA)
+)
 
 # -----------------------------------------------------------------------------
 # Sidebar filters and selected week
@@ -470,10 +516,10 @@ with st.container(border=True):
 # -----------------------------------------------------------------------------
 # Weekly trends
 # -----------------------------------------------------------------------------
-section("Weekly Revenue Detail", "Numbers first: revenue, eligible pounds, weighted $/LB, orders, and customers by week.")
-weekly_display = weekly[["Week Start", "Revenue", "Lbs", "Weighted $/LB", "Orders", "Customers"]].copy().sort_values("Week Start", ascending=False)
+section("Weekly Revenue Detail", "Numbers first: revenue, roasted-coffee pounds, average and weighted $/LB, orders, and customers by week.")
+weekly_display = weekly[["Week Start", "Revenue", "Lbs", "Average $/LB", "Weighted $/LB", "Orders", "Customers"]].copy().sort_values("Week Start", ascending=False)
 weekly_display["Week Of"] = weekly_display["Week Start"].dt.strftime("%b %d, %Y")
-weekly_display = weekly_display[["Week Of", "Revenue", "Lbs", "Weighted $/LB", "Orders", "Customers"]]
+weekly_display = weekly_display[["Week Of", "Revenue", "Lbs", "Average $/LB", "Weighted $/LB", "Orders", "Customers"]]
 st.download_button("⇩ Export Weekly Revenue", weekly_display.to_csv(index=False).encode("utf-8"), "Weekly_Revenue.csv", "text/csv")
 st.dataframe(style_revenue_table(weekly_display), width="stretch", hide_index=True)
 
@@ -482,14 +528,14 @@ st.plotly_chart(revenue_trend_chart(weekly), width='stretch')
 
 section(
     "Sales: Roasted Coffee, Lbs and $/LB",
-    "Revenue is shown for all filtered transactions. Lbs and weighted $/LB exclude Retail and rows without positive pounds.",
+    "Invoiced Sales, pounds, average $/LB, and weighted $/LB follow the CFO roasted-coffee methodology. Retail/cafe and non-roasted-coffee rows are excluded from this chart.",
 )
 st.plotly_chart(combo_chart(weekly, ""), width='stretch')
 
 # -----------------------------------------------------------------------------
 # Channel-specific weekly analysis
 # -----------------------------------------------------------------------------
-section("Channel Performance", "Weekly revenue, eligible pounds, and weighted $/LB by major channel.")
+section("Channel Performance", "Weekly revenue, roasted-coffee pounds, average $/LB, and weighted $/LB by major channel.")
 channel_tabs = st.tabs(["Grocery", "Foodservice", "E-Commerce", "Retail"])
 for tab, channel_name in zip(channel_tabs, ["Grocery", "Foodservice", "E-Commerce", "Retail"]):
     with tab:
