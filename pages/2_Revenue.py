@@ -139,7 +139,7 @@ def weekly_summary(frame: pd.DataFrame) -> pd.DataFrame:
         .sort_values("Week Start")
     )
 
-    # Match the CFO pivot table exactly:
+    # Match the weekly pricing summary:
     #   Average $/LB  = simple average of each eligible source row's $/LB.
     #   Weighted $/LB = total eligible invoiced sales / total eligible pounds.
     # Revenue rows with zero pounds remain in invoiced sales (the numerator),
@@ -411,11 +411,9 @@ if df.empty:
     footer()
     st.stop()
 
-# Match the CFO pivot-table population. The report includes Finished Goods:
-# Roasted Coffee sold through wholesale channels and excludes E-Commerce,
-# Corporate, Retail, and intercompany café activity from both $/LB measures.
-# Pounds are recalculated from Quantity x Units x package size / 16 whenever
-# those source fields are available.
+# Wholesale pricing population: Finished Goods: Roasted Coffee sold through
+# wholesale channels. E-Commerce, Corporate, Retail, and intercompany café
+# activity are reported separately from the wholesale $/LB calculation.
 excluded_pricing_channel_mask = df["Sales Channel"].str.contains(
     r"e[- ]?commerce|corporate|(^|:)\s*retail($|\s|:)|intercompany.*retail.*caf",
     case=False,
@@ -438,26 +436,54 @@ units_column = next(
     None,
 )
 size_column = next(
-    (name for name in ["Roasted Coffee Size", "Coffee Size Oz", "Size Oz"] if name in df.columns),
+    (name for name in ["Roasted Coffee Size", "Coffee Size", "Coffee Size Oz", "Size Oz"] if name in df.columns),
     None,
 )
 
-calculated_lbs = pd.Series(pd.NA, index=df.index, dtype="Float64")
-if quantity_column and units_column and size_column:
-    quantity = pd.to_numeric(df[quantity_column], errors="coerce").abs()
-    units = pd.to_numeric(df[units_column], errors="coerce").abs()
-    size_oz = pd.to_numeric(df[size_column], errors="coerce").abs()
-    calculated_lbs = (quantity * units * size_oz / 16.0).astype("Float64")
+def parse_package_weight_lbs(value) -> float:
+    """Convert package-size values such as 12 oz, 2 lb, or numeric ounces to lbs."""
+    if pd.isna(value):
+        return 0.0
+    text = str(value).strip().lower().replace("pounds", "lb").replace("pound", "lb")
+    text = text.replace("ounces", "oz").replace("ounce", "oz")
+    import re
+    match = re.search(r"(-?\d+(?:\.\d+)?)", text)
+    if not match:
+        return 0.0
+    number = abs(float(match.group(1)))
+    if "oz" in text:
+        return number / 16.0
+    if "lb" in text:
+        return number
+    # Numeric helper columns are assumed to be ounces when their name says Oz;
+    # otherwise treat them as pounds.
+    return number / 16.0 if size_column and "oz" in size_column.lower() else number
+
+quantity = pd.to_numeric(df[quantity_column], errors="coerce").abs() if quantity_column else pd.Series(0.0, index=df.index)
+units = pd.to_numeric(df[units_column], errors="coerce").abs() if units_column else pd.Series(1.0, index=df.index)
+units = units.where(units > 0, 1.0)
+package_weight_lbs = df[size_column].apply(parse_package_weight_lbs) if size_column else pd.Series(0.0, index=df.index)
+
+# Quantity behaves differently by channel in the source report:
+# - Grocery quantity is case quantity, so multiply by units per case.
+# - Foodservice quantity already represents sellable packages, so do not
+#   multiply by units again.
+# - Other channels use the full quantity x units calculation for audit purposes.
+grocery_mask = df["Channel Group"].eq("Grocery")
+foodservice_mask = df["Channel Group"].eq("Foodservice")
+calculated_lbs = quantity * units * package_weight_lbs
+calculated_lbs = calculated_lbs.where(~foodservice_mask, quantity * package_weight_lbs)
 
 source_lbs = pd.to_numeric(df["Lbs"], errors="coerce").abs()
-# Prefer the source-field calculation when valid; otherwise retain the normalized
-# Lbs value supplied by the upload cleaner.
-df["CFO Lbs"] = calculated_lbs.where(calculated_lbs > 0, source_lbs).fillna(0.0)
+df["Calculated Lbs"] = calculated_lbs.where(calculated_lbs > 0, source_lbs).fillna(0.0)
+df["Lbs Method"] = "Quantity × Units × Package Weight"
+df.loc[foodservice_mask, "Lbs Method"] = "Quantity × Package Weight"
+df.loc[df["Calculated Lbs"] <= 0, "Lbs Method"] = "Missing / unavailable"
 
 eligible_pricing_mask = roasted_coffee_mask & (~excluded_pricing_channel_mask)
-eligible_lb_mask = eligible_pricing_mask & (df["CFO Lbs"] > 0)
-df["Eligible Lbs"] = df["CFO Lbs"].where(eligible_lb_mask, 0.0)
-# The CFO pivot includes eligible roasted-coffee sales even when a source row has
+eligible_lb_mask = eligible_pricing_mask & (df["Calculated Lbs"] > 0)
+df["Eligible Lbs"] = df["Calculated Lbs"].where(eligible_lb_mask, 0.0)
+# Eligible roasted-coffee sales with missing pounds remain visible for review;
 # no pounds; those rows affect weighted $/LB but not the simple average $/LB.
 df["Eligible Revenue"] = df["Revenue"].where(eligible_pricing_mask, 0.0)
 
@@ -472,10 +498,10 @@ intercompany_retail_mask = channel_lower.str.contains(
 retail_cafe_mask = channel_lower.str.contains(r"retail|cafe|café", regex=True, na=False)
 corporate_mask = channel_lower.str.contains(r"corporate", regex=True, na=False)
 ecommerce_mask = channel_lower.str.contains(r"e[- ]?commerce|ecommerce", regex=True, na=False)
-missing_lbs_mask = eligible_pricing_mask & (df["CFO Lbs"] <= 0) & (df["Revenue"] != 0)
+missing_lbs_mask = eligible_pricing_mask & (df["Calculated Lbs"] <= 0) & (df["Revenue"] != 0)
 negative_lbs_mask = pd.to_numeric(df["Lbs"], errors="coerce").fillna(0) < 0
 
-df["Audit Status"] = "Included in CFO $/LB"
+df["Audit Status"] = "Included in Wholesale $/LB"
 df.loc[~roasted_coffee_mask, "Audit Status"] = "Excluded - Non-roasted coffee"
 df.loc[ecommerce_mask & roasted_coffee_mask, "Audit Status"] = "Excluded - E-Commerce"
 df.loc[corporate_mask & roasted_coffee_mask, "Audit Status"] = "Excluded - Corporate"
@@ -490,8 +516,8 @@ df.loc[df["Sales Channel"].eq("Unassigned"), "Audit Issue"] = "Sales channel is 
 df.loc[df["Customer"].eq("Unassigned"), "Audit Issue"] = "Customer is missing"
 
 df["Included in Total Revenue"] = True
-df["Included in CFO $/LB"] = eligible_pricing_mask
-df["Included in Valid-Lbs $/LB"] = eligible_lb_mask
+df["Included in Wholesale Population"] = eligible_pricing_mask
+df["Included in Wholesale $/LB"] = eligible_lb_mask
 df["Missing Lbs Revenue"] = df["Revenue"].where(missing_lbs_mask, 0.0)
 df["Excluded Pricing Revenue"] = df["Revenue"].where(~eligible_pricing_mask, 0.0)
 
@@ -573,7 +599,7 @@ prior_four_revenue = float(prior_four["Revenue"].mean()) if not prior_four.empty
 # -----------------------------------------------------------------------------
 section(
     f"Week {int((selected_week + pd.Timedelta(days=1)).isocalendar().week)} Executive Summary",
-    f"Week of {selected_week:%B %d} through {(selected_week + pd.Timedelta(days=6)):%B %d, %Y}. E-Commerce, Corporate, Retail, and intercompany café activity are excluded from CFO $/LB reporting.",
+    f"Week of {selected_week:%B %d} through {(selected_week + pd.Timedelta(days=6)):%B %d, %Y}. E-Commerce, Corporate, Retail, and intercompany café activity are excluded from wholesale pricing reporting.",
 )
 metric_row(
     [
@@ -610,7 +636,7 @@ if missing_lbs_revenue != 0:
     )
 if excluded_pricing_revenue != 0:
     insights.append(
-        f"{format_money(excluded_pricing_revenue, 0)} of selected-week revenue is outside the CFO wholesale $/LB population and is shown separately below."
+        f"{format_money(excluded_pricing_revenue, 0)} of selected-week revenue is reported outside the wholesale pricing calculation and is shown separately below."
     )
 
 with st.container(border=True):
@@ -619,7 +645,7 @@ with st.container(border=True):
         st.markdown(f"- {insight}")
 
 # -----------------------------------------------------------------------------
-# Data quality and CFO reconciliation
+# Data quality and pricing reconciliation
 # -----------------------------------------------------------------------------
 section(
     "Revenue Audit & Data Quality",
@@ -627,8 +653,8 @@ section(
 )
 
 total_selected_revenue = float(selected_df["Revenue"].sum())
-valid_pricing_revenue = float(selected_df.loc[selected_df["Included in Valid-Lbs $/LB"], "Revenue"].sum())
-valid_pricing_lbs = float(selected_df.loc[selected_df["Included in Valid-Lbs $/LB"], "CFO Lbs"].sum())
+valid_pricing_revenue = float(selected_df.loc[selected_df["Included in Wholesale $/LB"], "Revenue"].sum())
+valid_pricing_lbs = float(selected_df.loc[selected_df["Included in Wholesale $/LB"], "Calculated Lbs"].sum())
 valid_weighted = valid_pricing_revenue / valid_pricing_lbs if valid_pricing_lbs else 0.0
 retail_ic_revenue = float(
     selected_df.loc[selected_df["Audit Status"] == "Excluded - Intercompany Retail/Cafe", "Revenue"].sum()
@@ -637,11 +663,11 @@ retail_ic_revenue = float(
 metric_row(
     [
         ("Total Reported Revenue", format_money(total_selected_revenue, 2)),
-        ("Valid Wholesale Coffee Revenue", format_money(valid_pricing_revenue, 2)),
-        ("Valid Wholesale Coffee Lbs", format_number(valid_pricing_lbs, 1)),
-        ("Valid-Lbs Weighted $/LB", format_money(valid_weighted)),
-        ("Missing-Lbs Coffee Revenue", format_money(missing_lbs_revenue, 2)),
-        ("I/C Retail/Cafe Revenue", format_money(retail_ic_revenue, 2)),
+        ("Wholesale Coffee Revenue Used", format_money(valid_pricing_revenue, 2)),
+        ("Wholesale Coffee Pounds Used", format_number(valid_pricing_lbs, 1)),
+        ("Calculated Wholesale $/LB", format_money(valid_weighted)),
+        ("Coffee Revenue Missing Pounds", format_money(missing_lbs_revenue, 2)),
+        ("Intercompany Retail/Cafe Revenue", format_money(retail_ic_revenue, 2)),
     ]
 )
 
@@ -652,29 +678,33 @@ if missing_lbs_revenue != 0:
     )
 if retail_ic_revenue != 0:
     st.warning(
-        f"Potential intercompany retail/cafe activity totals {format_money(retail_ic_revenue, 2)} and is excluded from the CFO wholesale $/LB view."
+        f"Potential intercompany retail/cafe activity totals {format_money(retail_ic_revenue, 2)} and is reported separately from the wholesale pricing calculation."
     )
 
 recon = (
     selected_df.groupby("Audit Status", dropna=False)
     .agg(
         Revenue=("Revenue", "sum"),
-        Lbs=("CFO Lbs", "sum"),
+        Lbs=("Calculated Lbs", "sum"),
         Rows=("Document Number", "size"),
         Documents=("Document Number", "nunique"),
     )
     .reset_index()
     .rename(columns={"Audit Status": "Classification"})
 )
-recon["Included in CFO $/LB"] = recon["Classification"].eq("Included in CFO $/LB")
-recon["Needs Review"] = recon["Classification"].str.startswith("Review -", na=False)
+recon["Revenue Share"] = recon["Revenue"].div(total_selected_revenue if total_selected_revenue else 1).mul(100)
+recon["Reporting Treatment"] = "Reported separately"
+recon.loc[recon["Classification"].eq("Included in Wholesale $/LB"), "Reporting Treatment"] = "Used in wholesale $/LB"
+recon.loc[recon["Classification"].str.startswith("Review -", na=False), "Reporting Treatment"] = "Review source data"
 recon["Revenue"] = recon["Revenue"].round(2)
 recon["Lbs"] = recon["Lbs"].round(2)
+recon["Revenue Share"] = recon["Revenue Share"].round(1).map(lambda value: f"{value:.1f}%")
+recon = recon[["Classification", "Revenue", "Revenue Share", "Lbs", "Rows", "Documents", "Reporting Treatment"]]
 st.dataframe(style_revenue_table(recon), width="stretch", hide_index=True)
 
 audit_detail_columns = [
     "Week Raw", "Sales Channel", "Channel Group", "Customer", "Document Number",
-    "Item Class", "Item / Memo", "Revenue", "CFO Lbs", "Audit Status", "Audit Issue",
+    "Item Class", "Item / Memo", "Revenue", "Calculated Lbs", "Audit Status", "Audit Issue",
 ]
 audit_detail_columns = [c for c in audit_detail_columns if c in selected_df.columns]
 audit_detail = selected_df[audit_detail_columns].copy()
@@ -710,7 +740,7 @@ st.plotly_chart(revenue_trend_chart(weekly), width='stretch')
 
 section(
     "Sales: Roasted Coffee, Lbs and $/LB",
-    "Invoiced Sales, pounds, average $/LB, and weighted $/LB follow the CFO roasted-coffee methodology. Retail/cafe and non-roasted-coffee rows are excluded from this chart.",
+    "Invoiced Sales, pounds, average $/LB, and weighted $/LB use the wholesale roasted-coffee calculation. Retail/cafe and non-roasted-coffee rows are excluded from this chart.",
 )
 st.plotly_chart(combo_chart(weekly, ""), width='stretch')
 
