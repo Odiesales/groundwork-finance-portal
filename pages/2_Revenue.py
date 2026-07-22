@@ -133,13 +133,34 @@ def weekly_summary(frame: pd.DataFrame) -> pd.DataFrame:
             Roasted_Revenue=("Eligible Revenue", "sum"),
             Lbs=("Eligible Lbs", "sum"),
             Eligible_Revenue=("Eligible Revenue", "sum"),
-            Average_Dollar_Per_Lb=("Average $/LB Row", "mean"),
             Orders=("Document Number", "nunique"),
             Customers=("Customer", "nunique"),
         )
         .sort_values("Week Start")
     )
-    grouped["Average $/LB"] = grouped["Average_Dollar_Per_Lb"].fillna(0.0)
+
+    # CFO average: calculate each customer's realized roasted-coffee $/LB first,
+    # then take the simple average of those customer rates for the week. This
+    # prevents small invoice lines from receiving the same weight as full orders.
+    customer_rates = (
+        frame.loc[frame["Eligible Lbs"] > 0]
+        .groupby(["Week Start", "Customer"], as_index=False)
+        .agg(
+            Customer_Revenue=("Eligible Revenue", "sum"),
+            Customer_Lbs=("Eligible Lbs", "sum"),
+        )
+    )
+    customer_rates["Customer $/LB"] = customer_rates["Customer_Revenue"].div(
+        customer_rates["Customer_Lbs"].replace(0, pd.NA)
+    )
+    average_rates = (
+        customer_rates.groupby("Week Start")["Customer $/LB"]
+        .mean()
+        .rename("Average $/LB")
+    )
+
+    grouped = grouped.merge(average_rates, on="Week Start", how="left")
+    grouped["Average $/LB"] = grouped["Average $/LB"].fillna(0.0)
     grouped["Weighted $/LB"] = grouped["Eligible_Revenue"].div(
         grouped["Lbs"].replace(0, pd.NA)
     ).fillna(0.0)
@@ -395,10 +416,9 @@ if df.empty:
     footer()
     st.stop()
 
-# Match the CFO report: the pounds and both $/LB measures are based only on
-# Finished Goods: Roasted Coffee rows with positive pounds. Retail/cafe rows are
-# excluded. Average $/LB is the simple average of the underlying row-level rates;
-# weighted $/LB is total eligible revenue divided by total eligible pounds.
+# Match the CFO report: pounds and both $/LB measures use only Finished Goods:
+# Roasted Coffee. Recalculate pounds from the workbook's source fields whenever
+# they are available: Quantity x Units x package size / 16.
 retail_mask = (
     df["Sales Channel"].str.contains("retail|cafe|café", case=False, regex=True, na=False)
     | df["Item Class"].str.contains("retail", case=False, regex=False, na=False)
@@ -409,12 +429,35 @@ roasted_coffee_mask = df["Item Class"].str.contains(
     regex=True,
     na=False,
 )
-eligible_lb_mask = roasted_coffee_mask & (~retail_mask) & (df["Lbs"] > 0)
-df["Eligible Lbs"] = df["Lbs"].where(eligible_lb_mask, 0.0)
-df["Eligible Revenue"] = df["Revenue"].where(eligible_lb_mask, 0.0)
-df["Average $/LB Row"] = df["Eligible Revenue"].div(
-    df["Eligible Lbs"].replace(0, pd.NA)
+
+quantity_column = next(
+    (name for name in ["Sum of Quantity", "Quantity"] if name in df.columns),
+    None,
 )
+units_column = next(
+    (name for name in ["Sum of # of Units", "# of Units", "Units"] if name in df.columns),
+    None,
+)
+size_column = next(
+    (name for name in ["Roasted Coffee Size", "Coffee Size Oz", "Size Oz"] if name in df.columns),
+    None,
+)
+
+calculated_lbs = pd.Series(pd.NA, index=df.index, dtype="Float64")
+if quantity_column and units_column and size_column:
+    quantity = pd.to_numeric(df[quantity_column], errors="coerce").abs()
+    units = pd.to_numeric(df[units_column], errors="coerce").abs()
+    size_oz = pd.to_numeric(df[size_column], errors="coerce").abs()
+    calculated_lbs = (quantity * units * size_oz / 16.0).astype("Float64")
+
+source_lbs = pd.to_numeric(df["Lbs"], errors="coerce").abs()
+# Prefer the source-field calculation when valid; otherwise retain the normalized
+# Lbs value supplied by the upload cleaner.
+df["CFO Lbs"] = calculated_lbs.where(calculated_lbs > 0, source_lbs).fillna(0.0)
+
+eligible_lb_mask = roasted_coffee_mask & (~retail_mask) & (df["CFO Lbs"] > 0)
+df["Eligible Lbs"] = df["CFO Lbs"].where(eligible_lb_mask, 0.0)
+df["Eligible Revenue"] = df["Revenue"].where(eligible_lb_mask, 0.0)
 
 # -----------------------------------------------------------------------------
 # Sidebar filters and selected week
@@ -520,6 +563,9 @@ section("Weekly Revenue Detail", "Numbers first: revenue, roasted-coffee pounds,
 weekly_display = weekly[["Week Start", "Revenue", "Lbs", "Average $/LB", "Weighted $/LB", "Orders", "Customers"]].copy().sort_values("Week Start", ascending=False)
 weekly_display["Week Of"] = weekly_display["Week Start"].dt.strftime("%b %d, %Y")
 weekly_display = weekly_display[["Week Of", "Revenue", "Lbs", "Average $/LB", "Weighted $/LB", "Orders", "Customers"]]
+weekly_display["Average $/LB"] = weekly_display["Average $/LB"].round(2)
+weekly_display["Weighted $/LB"] = weekly_display["Weighted $/LB"].round(2)
+weekly_display["Lbs"] = weekly_display["Lbs"].round(2)
 st.download_button("⇩ Export Weekly Revenue", weekly_display.to_csv(index=False).encode("utf-8"), "Weekly_Revenue.csv", "text/csv")
 st.dataframe(style_revenue_table(weekly_display), width="stretch", hide_index=True)
 
