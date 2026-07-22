@@ -129,7 +129,7 @@ def weekly_summary(frame: pd.DataFrame) -> pd.DataFrame:
     grouped = (
         frame.groupby("Week Start", as_index=False)
         .agg(
-            Revenue=("Revenue", "sum"),
+            Revenue=("Eligible Revenue", "sum"),
             Roasted_Revenue=("Eligible Revenue", "sum"),
             Lbs=("Eligible Lbs", "sum"),
             Eligible_Revenue=("Eligible Revenue", "sum"),
@@ -139,22 +139,17 @@ def weekly_summary(frame: pd.DataFrame) -> pd.DataFrame:
         .sort_values("Week Start")
     )
 
-    # CFO average: calculate each customer's realized roasted-coffee $/LB first,
-    # then take the simple average of those customer rates for the week. This
-    # prevents small invoice lines from receiving the same weight as full orders.
-    customer_rates = (
-        frame.loc[frame["Eligible Lbs"] > 0]
-        .groupby(["Week Start", "Customer"], as_index=False)
-        .agg(
-            Customer_Revenue=("Eligible Revenue", "sum"),
-            Customer_Lbs=("Eligible Lbs", "sum"),
-        )
-    )
-    customer_rates["Customer $/LB"] = customer_rates["Customer_Revenue"].div(
-        customer_rates["Customer_Lbs"].replace(0, pd.NA)
+    # Match the CFO pivot table exactly:
+    #   Average $/LB  = simple average of each eligible source row's $/LB.
+    #   Weighted $/LB = total eligible invoiced sales / total eligible pounds.
+    # Revenue rows with zero pounds remain in invoiced sales (the numerator),
+    # while their undefined row-level $/LB is naturally excluded from the average.
+    row_rates = frame.loc[frame["Eligible Lbs"] > 0, ["Week Start", "Eligible Revenue", "Eligible Lbs"]].copy()
+    row_rates["Row $/LB"] = row_rates["Eligible Revenue"].div(
+        row_rates["Eligible Lbs"].replace(0, pd.NA)
     )
     average_rates = (
-        customer_rates.groupby("Week Start")["Customer $/LB"]
+        row_rates.groupby("Week Start")["Row $/LB"]
         .mean()
         .rename("Average $/LB")
     )
@@ -416,12 +411,16 @@ if df.empty:
     footer()
     st.stop()
 
-# Match the CFO report: pounds and both $/LB measures use only Finished Goods:
-# Roasted Coffee. Recalculate pounds from the workbook's source fields whenever
-# they are available: Quantity x Units x package size / 16.
-retail_mask = (
-    df["Sales Channel"].str.contains("retail|cafe|café", case=False, regex=True, na=False)
-    | df["Item Class"].str.contains("retail", case=False, regex=False, na=False)
+# Match the CFO pivot-table population. The report includes Finished Goods:
+# Roasted Coffee sold through wholesale channels and excludes E-Commerce,
+# Corporate, Retail, and intercompany café activity from both $/LB measures.
+# Pounds are recalculated from Quantity x Units x package size / 16 whenever
+# those source fields are available.
+excluded_pricing_channel_mask = df["Sales Channel"].str.contains(
+    r"e[- ]?commerce|corporate|(^|:)\s*retail($|\s|:)|intercompany.*retail.*caf",
+    case=False,
+    regex=True,
+    na=False,
 )
 roasted_coffee_mask = df["Item Class"].str.contains(
     r"finished goods\s*:\s*roasted coffee",
@@ -455,9 +454,46 @@ source_lbs = pd.to_numeric(df["Lbs"], errors="coerce").abs()
 # Lbs value supplied by the upload cleaner.
 df["CFO Lbs"] = calculated_lbs.where(calculated_lbs > 0, source_lbs).fillna(0.0)
 
-eligible_lb_mask = roasted_coffee_mask & (~retail_mask) & (df["CFO Lbs"] > 0)
+eligible_pricing_mask = roasted_coffee_mask & (~excluded_pricing_channel_mask)
+eligible_lb_mask = eligible_pricing_mask & (df["CFO Lbs"] > 0)
 df["Eligible Lbs"] = df["CFO Lbs"].where(eligible_lb_mask, 0.0)
-df["Eligible Revenue"] = df["Revenue"].where(eligible_lb_mask, 0.0)
+# The CFO pivot includes eligible roasted-coffee sales even when a source row has
+# no pounds; those rows affect weighted $/LB but not the simple average $/LB.
+df["Eligible Revenue"] = df["Revenue"].where(eligible_pricing_mask, 0.0)
+
+# Revenue-audit classifications. These fields do not silently remove source data;
+# they explain how each row is treated and surface records that need review.
+channel_lower = df["Sales Channel"].str.lower()
+intercompany_retail_mask = channel_lower.str.contains(
+    r"intercompany.*(retail|caf)|(?:retail|caf).*intercompany|i/c.*(retail|caf)",
+    regex=True,
+    na=False,
+)
+retail_cafe_mask = channel_lower.str.contains(r"retail|cafe|café", regex=True, na=False)
+corporate_mask = channel_lower.str.contains(r"corporate", regex=True, na=False)
+ecommerce_mask = channel_lower.str.contains(r"e[- ]?commerce|ecommerce", regex=True, na=False)
+missing_lbs_mask = eligible_pricing_mask & (df["CFO Lbs"] <= 0) & (df["Revenue"] != 0)
+negative_lbs_mask = pd.to_numeric(df["Lbs"], errors="coerce").fillna(0) < 0
+
+df["Audit Status"] = "Included in CFO $/LB"
+df.loc[~roasted_coffee_mask, "Audit Status"] = "Excluded - Non-roasted coffee"
+df.loc[ecommerce_mask & roasted_coffee_mask, "Audit Status"] = "Excluded - E-Commerce"
+df.loc[corporate_mask & roasted_coffee_mask, "Audit Status"] = "Excluded - Corporate"
+df.loc[retail_cafe_mask & roasted_coffee_mask, "Audit Status"] = "Excluded - Retail/Cafe"
+df.loc[intercompany_retail_mask & roasted_coffee_mask, "Audit Status"] = "Excluded - Intercompany Retail/Cafe"
+df.loc[missing_lbs_mask, "Audit Status"] = "Review - Eligible coffee revenue missing lbs"
+
+df["Audit Issue"] = ""
+df.loc[missing_lbs_mask, "Audit Issue"] = "Roasted-coffee revenue has zero or missing pounds"
+df.loc[negative_lbs_mask, "Audit Issue"] = "Source pounds are negative; absolute value is used for reporting"
+df.loc[df["Sales Channel"].eq("Unassigned"), "Audit Issue"] = "Sales channel is missing"
+df.loc[df["Customer"].eq("Unassigned"), "Audit Issue"] = "Customer is missing"
+
+df["Included in Total Revenue"] = True
+df["Included in CFO $/LB"] = eligible_pricing_mask
+df["Included in Valid-Lbs $/LB"] = eligible_lb_mask
+df["Missing Lbs Revenue"] = df["Revenue"].where(missing_lbs_mask, 0.0)
+df["Excluded Pricing Revenue"] = df["Revenue"].where(~eligible_pricing_mask, 0.0)
 
 # -----------------------------------------------------------------------------
 # Sidebar filters and selected week
@@ -537,7 +573,7 @@ prior_four_revenue = float(prior_four["Revenue"].mean()) if not prior_four.empty
 # -----------------------------------------------------------------------------
 section(
     f"Week {int((selected_week + pd.Timedelta(days=1)).isocalendar().week)} Executive Summary",
-    f"Week of {selected_week:%B %d} through {(selected_week + pd.Timedelta(days=6)):%B %d, %Y}. Retail revenue is excluded from pounds and weighted $/LB.",
+    f"Week of {selected_week:%B %d} through {(selected_week + pd.Timedelta(days=6)):%B %d, %Y}. E-Commerce, Corporate, Retail, and intercompany café activity are excluded from CFO $/LB reporting.",
 )
 metric_row(
     [
@@ -551,10 +587,110 @@ metric_row(
 )
 
 insights = make_insights(current_row, prior_row, prior_four)
+
+# Add a concise executive story using the selected week's underlying detail.
+channel_story = (
+    selected_df.groupby("Channel Group", dropna=False)["Revenue"]
+    .sum()
+    .sort_values(ascending=False)
+)
+if not channel_story.empty:
+    top_channel = str(channel_story.index[0])
+    top_channel_revenue = float(channel_story.iloc[0])
+    insights.append(
+        f"{top_channel} was the largest reported channel at {format_money(top_channel_revenue, 0)} for the selected week."
+    )
+
+missing_lbs_revenue = float(selected_df["Missing Lbs Revenue"].sum())
+missing_lbs_rows = int((selected_df["Audit Status"] == "Review - Eligible coffee revenue missing lbs").sum())
+excluded_pricing_revenue = float(selected_df["Excluded Pricing Revenue"].sum())
+if missing_lbs_revenue != 0:
+    insights.append(
+        f"Data-quality review: {format_money(missing_lbs_revenue, 0)} across {missing_lbs_rows:,} roasted-coffee row(s) has no usable pounds and can distort weighted $/LB."
+    )
+if excluded_pricing_revenue != 0:
+    insights.append(
+        f"{format_money(excluded_pricing_revenue, 0)} of selected-week revenue is outside the CFO wholesale $/LB population and is shown separately below."
+    )
+
 with st.container(border=True):
-    st.markdown("#### Weekly Insights")
+    st.markdown("#### Weekly Story")
     for insight in insights:
         st.markdown(f"- {insight}")
+
+# -----------------------------------------------------------------------------
+# Data quality and CFO reconciliation
+# -----------------------------------------------------------------------------
+section(
+    "Revenue Audit & Data Quality",
+    "This section explains what is included, excluded, or held for review before the charts are interpreted.",
+)
+
+total_selected_revenue = float(selected_df["Revenue"].sum())
+valid_pricing_revenue = float(selected_df.loc[selected_df["Included in Valid-Lbs $/LB"], "Revenue"].sum())
+valid_pricing_lbs = float(selected_df.loc[selected_df["Included in Valid-Lbs $/LB"], "CFO Lbs"].sum())
+valid_weighted = valid_pricing_revenue / valid_pricing_lbs if valid_pricing_lbs else 0.0
+retail_ic_revenue = float(
+    selected_df.loc[selected_df["Audit Status"] == "Excluded - Intercompany Retail/Cafe", "Revenue"].sum()
+)
+
+metric_row(
+    [
+        ("Total Reported Revenue", format_money(total_selected_revenue, 2)),
+        ("Valid Wholesale Coffee Revenue", format_money(valid_pricing_revenue, 2)),
+        ("Valid Wholesale Coffee Lbs", format_number(valid_pricing_lbs, 1)),
+        ("Valid-Lbs Weighted $/LB", format_money(valid_weighted)),
+        ("Missing-Lbs Coffee Revenue", format_money(missing_lbs_revenue, 2)),
+        ("I/C Retail/Cafe Revenue", format_money(retail_ic_revenue, 2)),
+    ]
+)
+
+if missing_lbs_revenue != 0:
+    st.error(
+        f"Wholesale roasted-coffee revenue with no usable pounds: {format_money(missing_lbs_revenue, 2)} across {missing_lbs_rows:,} row(s). "
+        "These rows are visible in the audit detail and should be corrected or approved before relying on $/LB."
+    )
+if retail_ic_revenue != 0:
+    st.warning(
+        f"Potential intercompany retail/cafe activity totals {format_money(retail_ic_revenue, 2)} and is excluded from the CFO wholesale $/LB view."
+    )
+
+recon = (
+    selected_df.groupby("Audit Status", dropna=False)
+    .agg(
+        Revenue=("Revenue", "sum"),
+        Lbs=("CFO Lbs", "sum"),
+        Rows=("Document Number", "size"),
+        Documents=("Document Number", "nunique"),
+    )
+    .reset_index()
+    .rename(columns={"Audit Status": "Classification"})
+)
+recon["Included in CFO $/LB"] = recon["Classification"].eq("Included in CFO $/LB")
+recon["Needs Review"] = recon["Classification"].str.startswith("Review -", na=False)
+recon["Revenue"] = recon["Revenue"].round(2)
+recon["Lbs"] = recon["Lbs"].round(2)
+st.dataframe(style_revenue_table(recon), width="stretch", hide_index=True)
+
+audit_detail_columns = [
+    "Week Raw", "Sales Channel", "Channel Group", "Customer", "Document Number",
+    "Item Class", "Item / Memo", "Revenue", "CFO Lbs", "Audit Status", "Audit Issue",
+]
+audit_detail_columns = [c for c in audit_detail_columns if c in selected_df.columns]
+audit_detail = selected_df[audit_detail_columns].copy()
+issues_only = audit_detail[
+    audit_detail["Audit Status"].str.startswith(("Review -", "Excluded -"), na=False)
+    | audit_detail["Audit Issue"].ne("")
+].copy()
+
+st.download_button(
+    "⇩ Export Revenue Audit Detail",
+    audit_detail.to_csv(index=False).encode("utf-8"),
+    f"Revenue_Audit_{selected_week:%Y-%m-%d}.csv",
+    "text/csv",
+)
+with st.expander(f"View audit exceptions and exclusions ({len(issues_only):,} rows)", expanded=missing_lbs_rows > 0):
+    st.dataframe(issues_only, width="stretch", hide_index=True)
 
 # -----------------------------------------------------------------------------
 # Weekly trends
@@ -581,7 +717,7 @@ st.plotly_chart(combo_chart(weekly, ""), width='stretch')
 # -----------------------------------------------------------------------------
 # Channel-specific weekly analysis
 # -----------------------------------------------------------------------------
-section("Channel Performance", "Weekly revenue, roasted-coffee pounds, average $/LB, and weighted $/LB by major channel.")
+section("Channel Performance", "Weekly results by channel. Missing-pound revenue and excluded populations are identified in the Revenue Audit above.")
 channel_tabs = st.tabs(["Grocery", "Foodservice", "E-Commerce", "Retail"])
 for tab, channel_name in zip(channel_tabs, ["Grocery", "Foodservice", "E-Commerce", "Retail"]):
     with tab:
