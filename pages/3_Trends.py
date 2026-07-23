@@ -19,13 +19,13 @@ if not rev.empty:
     st.dataframe(
         monthly, width="stretch", hide_index=True,
         column_config={
-            "Revenue": st.column_config.NumberColumn("Revenue", format="$%.2f"),
+            "Revenue": st.column_config.NumberColumn("Revenue", format="$%,.2f"),
             "Lbs": st.column_config.NumberColumn("Lbs", format="%,.2f"),
-            "Weighted $/LB": st.column_config.NumberColumn("Weighted $/LB", format="$%.2f"),
+            "Weighted $/LB": st.column_config.NumberColumn("Weighted $/LB", format="$%,.2f"),
             "MoM Revenue %": st.column_config.NumberColumn("MoM Revenue %", format="%.2f%%"),
             "MoM $/LB %": st.column_config.NumberColumn("MoM $/LB %", format="%.2f%%"),
-            "Revenue Change": st.column_config.NumberColumn("Revenue Change", format="$%.2f"),
-            "$/LB Change": st.column_config.NumberColumn("$/LB Change", format="$%.2f"),
+            "Revenue Change": st.column_config.NumberColumn("Revenue Change", format="$%,.2f"),
+            "$/LB Change": st.column_config.NumberColumn("$/LB Change", format="$%,.2f"),
         },
     )
 
@@ -68,7 +68,7 @@ if not ar.empty:
     comparison = pd.DataFrame(rows)
     st.download_button("⇩ Export AR Comparison", comparison.to_csv(index=False).encode("utf-8"), "AR_Snapshot_Comparison.csv", "text/csv")
     amount_cols = [c for c in comparison.columns if c not in ["Metric", "Change %"]]
-    config = {c: st.column_config.NumberColumn(c, format="$%.2f") for c in amount_cols}
+    config = {c: st.column_config.NumberColumn(c, format="$%,.2f") for c in amount_cols}
     config["Change %"] = st.column_config.NumberColumn("Change %", format="%.2f%%")
     st.dataframe(comparison, width="stretch", hide_index=True, column_config=config)
 
@@ -84,10 +84,10 @@ if not ar.empty:
         hist, width="stretch", hide_index=True,
         column_config={
             "As of Date": st.column_config.DateColumn("As of Date", format="MMM DD, YYYY"),
-            "Total AR": st.column_config.NumberColumn("Total AR", format="$%.2f"),
-            "Current": st.column_config.NumberColumn("Current", format="$%.2f"),
-            "Past Due": st.column_config.NumberColumn("Past Due", format="$%.2f"),
-            "WoW Change": st.column_config.NumberColumn("WoW Change", format="$%.2f"),
+            "Total AR": st.column_config.NumberColumn("Total AR", format="$%,.2f"),
+            "Current": st.column_config.NumberColumn("Current", format="$%,.2f"),
+            "Past Due": st.column_config.NumberColumn("Past Due", format="$%,.2f"),
+            "WoW Change": st.column_config.NumberColumn("WoW Change", format="$%,.2f"),
         },
     )
 footer()

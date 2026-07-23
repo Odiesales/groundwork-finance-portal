@@ -408,7 +408,7 @@ fig.update_layout(
     height=460, margin=dict(l=115, r=35, t=55, b=65), paper_bgcolor="white", plot_bgcolor="white",
     font=dict(size=15, color="#111827"), xaxis_title="Aging Bucket", yaxis_title="Open Balance",
     xaxis=dict(automargin=True, tickfont=dict(size=14, color="#111827"), title_font=dict(size=15, color="#111827"), linecolor="#111827"),
-    yaxis=dict(automargin=True, tickfont=dict(size=13, color="#111827"), title_font=dict(size=15, color="#111827"), tickformat="$,.0f", gridcolor="#d7dce3", linecolor="#111827"),
+    yaxis=dict(automargin=True, tickfont=dict(size=13, color="#111827"), title_font=dict(size=15, color="#111827"), tickformat="$,.2f", gridcolor="#d7dce3", linecolor="#111827"),
     showlegend=False,
 )
 st.plotly_chart(fig, width='stretch', theme=None)
@@ -426,7 +426,7 @@ channel_fig.update_layout(
     height=500, margin=dict(l=115, r=35, t=45, b=105), paper_bgcolor="white", plot_bgcolor="white",
     font=dict(size=14, color="#111827"), barmode="stack", legend_title_text="",
     xaxis=dict(automargin=True, tickangle=-20, tickfont=dict(size=13, color="#111827"), title="Channel"),
-    yaxis=dict(automargin=True, tickformat="$,.0f", tickfont=dict(size=13, color="#111827"), title="Open Balance", gridcolor="#d7dce3"),
+    yaxis=dict(automargin=True, tickformat="$,.2f", tickfont=dict(size=13, color="#111827"), title="Open Balance", gridcolor="#d7dce3"),
 )
 st.plotly_chart(channel_fig, width='stretch', theme=None)
 with st.expander("View Channel Aging Detail"):

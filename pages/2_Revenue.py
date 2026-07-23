@@ -235,7 +235,7 @@ def combo_chart(summary: pd.DataFrame, title: str = "") -> go.Figure:
         yaxis=dict(
             title="Invoiced Sales / Lbs",
             tickprefix="$",
-            tickformat="~s",
+            tickformat=",.2f",
             gridcolor="#e8eeea",
             zeroline=False,
         ),
@@ -258,21 +258,21 @@ def revenue_trend_chart(summary: pd.DataFrame) -> go.Figure:
     fig.add_bar(
         x=summary["Week Label"], y=summary["Revenue"], name="Revenue",
         marker_color="#155b49", text=summary["Revenue"],
-        texttemplate="$%{text:,.0f}", textposition="outside", cliponaxis=False,
+        texttemplate="$%{text:,.2f}", textposition="outside", cliponaxis=False,
         textfont=dict(size=10, color="#173f35"),
         hovertemplate="%{x}<br>Revenue: $%{y:,.2f}<extra></extra>",
     )
     if len(summary) >= 2:
         average = summary["Revenue"].mean()
         fig.add_hline(y=average, line_dash="dot", line_color="#d7a928",
-                      annotation_text=f"Average ${average:,.0f}",
+                      annotation_text=f"Average ${average:,.2f}",
                       annotation_position="top left",
                       annotation_font_color="#6b5715")
     layout = _base_layout(420)
     layout.update(
         showlegend=False,
         margin=dict(l=62, r=28, t=55, b=78),
-        yaxis=dict(title="Revenue", tickprefix="$", tickformat="~s", gridcolor="#e8eeea", zeroline=False),
+        yaxis=dict(title="Revenue", tickprefix="$", tickformat=",.2f", gridcolor="#e8eeea", zeroline=False),
     )
     fig.update_layout(**layout)
     return fig
@@ -293,7 +293,7 @@ def line_chart(pivot: pd.DataFrame, title: str, y_title: str, currency: bool = T
         legend=dict(orientation="h", yanchor="bottom", y=1.14, xanchor="left", x=0,
                     font=dict(size=10, color="#173f35"), bgcolor="rgba(255,255,255,0.9)"),
         yaxis=dict(title=y_title, tickprefix="$" if currency else "",
-                   tickformat="~s" if currency else "~s", gridcolor="#e8eeea", zeroline=False),
+                   tickformat=",.2f" if currency else "~s", gridcolor="#e8eeea", zeroline=False),
     )
     fig.update_layout(**layout)
     return fig
@@ -311,7 +311,7 @@ def make_insights(current: pd.Series, prior: pd.Series | None, prior_four: pd.Da
             direction = "increased" if rev_change >= 0 else "decreased"
             insights.append(
                 f"Revenue {direction} {abs(rev_change):.1f}% versus the prior week, "
-                f"from {format_money(prior['Revenue'], 0)} to {format_money(current['Revenue'], 0)}."
+                f"from {format_money(prior['Revenue'], 2)} to {format_money(current['Revenue'], 2)}."
             )
         if lbs_change is not None and price_change is not None:
             lbs_direction = "increased" if lbs_change >= 0 else "decreased"
@@ -328,7 +328,7 @@ def make_insights(current: pd.Series, prior: pd.Series | None, prior_four: pd.Da
             position = "above" if four_change >= 0 else "below"
             insights.append(
                 f"The selected week finished {abs(four_change):.1f}% {position} the prior four-week revenue average "
-                f"of {format_money(four_avg, 0)}."
+                f"of {format_money(four_avg, 2)}."
             )
 
     return insights or ["More weekly history is needed before comparative insights can be calculated."]
@@ -608,7 +608,7 @@ metric_row(
         (f"Weighted $/LB • {delta_text(current_weighted, prior_weighted)}", format_money(current_weighted)),
         (f"Orders • {delta_text(current_orders, prior_orders)}", f"{current_orders:,}"),
         ("Customers", f"{current_customers:,}"),
-        (f"Revenue • {four_week_text(current_revenue, prior_four_revenue)}", format_money(prior_four_revenue, 0)),
+        (f"Revenue • {four_week_text(current_revenue, prior_four_revenue)}", format_money(prior_four_revenue, 2)),
     ]
 )
 
@@ -624,7 +624,7 @@ if not channel_story.empty:
     top_channel = str(channel_story.index[0])
     top_channel_revenue = float(channel_story.iloc[0])
     insights.append(
-        f"{top_channel} was the largest reported channel at {format_money(top_channel_revenue, 0)} for the selected week."
+        f"{top_channel} was the largest reported channel at {format_money(top_channel_revenue, 2)} for the selected week."
     )
 
 missing_lbs_revenue = float(selected_df["Missing Lbs Revenue"].sum())
@@ -632,11 +632,11 @@ missing_lbs_rows = int((selected_df["Audit Status"] == "Review - Eligible coffee
 excluded_pricing_revenue = float(selected_df["Excluded Pricing Revenue"].sum())
 if missing_lbs_revenue != 0:
     insights.append(
-        f"Data-quality review: {format_money(missing_lbs_revenue, 0)} across {missing_lbs_rows:,} roasted-coffee row(s) has no usable pounds and can distort weighted $/LB."
+        f"Data-quality review: {format_money(missing_lbs_revenue, 2)} across {missing_lbs_rows:,} roasted-coffee row(s) has no usable pounds and can distort weighted $/LB."
     )
 if excluded_pricing_revenue != 0:
     insights.append(
-        f"{format_money(excluded_pricing_revenue, 0)} of selected-week revenue is reported outside the wholesale pricing calculation and is shown separately below."
+        f"{format_money(excluded_pricing_revenue, 2)} of selected-week revenue is reported outside the wholesale pricing calculation and is shown separately below."
     )
 
 with st.container(border=True):

@@ -152,7 +152,7 @@ with left:
     fig = go.Figure(go.Bar(
         x=aging.values, y=aging.index, orientation="h",
         marker_color=colors, text=[format_money(v, 2) for v in aging.values], textposition="auto",
-        hovertemplate="%{y}: $%{x:,.0f}<extra></extra>",
+        hovertemplate="%{y}: $%{x:,.2f}<extra></extra>",
     ))
     fig.update_layout(yaxis=dict(autorange="reversed"))
     st.plotly_chart(chart_layout(fig, height=335), width='stretch')
@@ -163,7 +163,7 @@ with right:
     fig = go.Figure(go.Bar(
         x=top.values, y=top.index, orientation="h", marker_color=GREEN_2,
         text=[format_money(v, 2) for v in top.values], textposition="auto",
-        hovertemplate="%{y}: $%{x:,.0f}<extra></extra>",
+        hovertemplate="%{y}: $%{x:,.2f}<extra></extra>",
     ))
     st.plotly_chart(chart_layout(fig, height=335), width='stretch')
 
