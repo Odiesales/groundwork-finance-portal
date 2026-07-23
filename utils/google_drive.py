@@ -1,8 +1,8 @@
 """Google Drive persistence for the Groundwork Finance Portal.
 
 The app uses a service account stored in Streamlit Secrets under
-[gcp_service_account]. The Shared Drive root folder ID should be stored in Streamlit Secrets under
-[gdrive] root_folder_id and the service account must be a Content manager.
+[gcp_service_account]. The shared Drive folder must be named
+"Groundwork Finance Portal" and shared with the service account as Editor.
 """
 from __future__ import annotations
 
@@ -19,7 +19,6 @@ from utils.paths import AR_SNAPSHOT_DIR, REVENUE_HISTORY_PATH, CURRENT_REVENUE_P
 
 SCOPES = ["https://www.googleapis.com/auth/drive"]
 ROOT_FOLDER_NAME = "Groundwork Finance Portal"
-DEFAULT_ROOT_FOLDER_ID = "0AJ10RJJYcJ0MUk9PVA"
 AR_FOLDER_NAME = "Accounts Receivable"
 REVENUE_FOLDER_NAME = "Revenue"
 
@@ -55,13 +54,31 @@ def _escape(value: str) -> str:
     return value.replace("'", "\\'")
 
 
+def _shared_drive_id() -> str:
+    try:
+        section = st.secrets["gdrive"]
+        drive_id = str(section.get("root_folder_id", "")).strip()
+    except Exception as exc:
+        raise DriveConfigurationError(
+            "Streamlit Secrets is missing [gdrive] root_folder_id."
+        ) from exc
+    if not drive_id:
+        raise DriveConfigurationError(
+            "Streamlit Secrets [gdrive] root_folder_id is blank."
+        )
+    return drive_id
+
+
 def _list_files(query: str, fields: str = "files(id,name,mimeType,modifiedTime,size)") -> list[dict]:
     service = drive_service()
+    drive_id = _shared_drive_id()
     files: list[dict] = []
     token = None
     while True:
         response = service.files().list(
             q=query,
+            corpora="drive",
+            driveId=drive_id,
             spaces="drive",
             fields=f"nextPageToken,{fields}",
             pageToken=token,
@@ -74,7 +91,6 @@ def _list_files(query: str, fields: str = "files(id,name,mimeType,modifiedTime,s
         token = response.get("nextPageToken")
         if not token:
             return files
-
 
 def _find_folder(name: str, parent_id: str | None = None) -> dict | None:
     clauses = [
@@ -100,45 +116,39 @@ def _create_folder(name: str, parent_id: str) -> dict:
     ).execute()
 
 
-def _configured_root_folder_id() -> str:
-    try:
-        section = st.secrets.get("gdrive", {})
-        if hasattr(section, "to_dict"):
-            section = section.to_dict()
-        folder_id = str(section.get("root_folder_id", "")).strip()
-    except Exception:
-        folder_id = ""
-    return folder_id or DEFAULT_ROOT_FOLDER_ID
-
-
 @st.cache_data(ttl=300, show_spinner=False)
 def portal_folder_ids() -> dict[str, str]:
-    root_id = _configured_root_folder_id()
+    drive_id = _shared_drive_id()
     try:
-        root = drive_service().files().get(
-            fileId=root_id,
-            fields="id,name,mimeType,driveId",
-            supportsAllDrives=True,
+        drive_service().drives().get(
+            driveId=drive_id,
+            fields="id,name",
         ).execute()
     except Exception as exc:
         raise DriveConfigurationError(
-            "The configured Google Shared Drive folder ID could not be opened. "
-            "Confirm [gdrive] root_folder_id is correct and the service account is a Content manager."
+            "The configured Shared Drive ID could not be opened. "
+            "Make sure the service account was added as a member of the Shared Drive "
+            "with Content manager access, not merely shared on a folder."
         ) from exc
 
-    ar = _find_folder(AR_FOLDER_NAME, root["id"]) or _create_folder(AR_FOLDER_NAME, root["id"])
-    revenue = _find_folder(REVENUE_FOLDER_NAME, root["id"]) or _create_folder(REVENUE_FOLDER_NAME, root["id"])
-    return {"root": root["id"], "ar": ar["id"], "revenue": revenue["id"]}
+    # The Shared Drive ID is also the root folder ID for file operations.
+    root_id = drive_id
+    ar = _find_folder(AR_FOLDER_NAME, root_id) or _create_folder(AR_FOLDER_NAME, root_id)
+    revenue = _find_folder(REVENUE_FOLDER_NAME, root_id) or _create_folder(REVENUE_FOLDER_NAME, root_id)
+    return {"root": root_id, "ar": ar["id"], "revenue": revenue["id"]}
 
 
 def connection_test() -> tuple[bool, str]:
     try:
-        folders = portal_folder_ids()
-        drive_service().files().get(fileId=folders["root"], fields="id,name", supportsAllDrives=True).execute()
-        return True, "Connected to Google Drive"
+        drive_id = _shared_drive_id()
+        drive = drive_service().drives().get(
+            driveId=drive_id,
+            fields="id,name",
+        ).execute()
+        portal_folder_ids()
+        return True, f'Connected to Shared Drive: {drive.get("name", "Google Drive")}'
     except Exception as exc:
         return False, str(exc)
-
 
 def _remote_file(name: str, folder_id: str) -> dict | None:
     matches = _list_files(
