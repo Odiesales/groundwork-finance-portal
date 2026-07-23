@@ -1,8 +1,8 @@
 """Google Drive persistence for the Groundwork Finance Portal.
 
 The app uses a service account stored in Streamlit Secrets under
-[gcp_service_account]. The shared Drive folder must be named
-"Groundwork Finance Portal" and shared with the service account as Editor.
+[gcp_service_account]. The Shared Drive root folder ID should be stored in Streamlit Secrets under
+[gdrive] root_folder_id and the service account must be a Content manager.
 """
 from __future__ import annotations
 
@@ -19,6 +19,7 @@ from utils.paths import AR_SNAPSHOT_DIR, REVENUE_HISTORY_PATH, CURRENT_REVENUE_P
 
 SCOPES = ["https://www.googleapis.com/auth/drive"]
 ROOT_FOLDER_NAME = "Groundwork Finance Portal"
+DEFAULT_ROOT_FOLDER_ID = "0AJ10RJJYcJ0MUk9PVA"
 AR_FOLDER_NAME = "Accounts Receivable"
 REVENUE_FOLDER_NAME = "Revenue"
 
@@ -99,14 +100,32 @@ def _create_folder(name: str, parent_id: str) -> dict:
     ).execute()
 
 
+def _configured_root_folder_id() -> str:
+    try:
+        section = st.secrets.get("gdrive", {})
+        if hasattr(section, "to_dict"):
+            section = section.to_dict()
+        folder_id = str(section.get("root_folder_id", "")).strip()
+    except Exception:
+        folder_id = ""
+    return folder_id or DEFAULT_ROOT_FOLDER_ID
+
+
 @st.cache_data(ttl=300, show_spinner=False)
 def portal_folder_ids() -> dict[str, str]:
-    root = _find_folder(ROOT_FOLDER_NAME)
-    if not root:
+    root_id = _configured_root_folder_id()
+    try:
+        root = drive_service().files().get(
+            fileId=root_id,
+            fields="id,name,mimeType,driveId",
+            supportsAllDrives=True,
+        ).execute()
+    except Exception as exc:
         raise DriveConfigurationError(
-            f'Google Drive folder "{ROOT_FOLDER_NAME}" was not found. '
-            "Confirm it is shared with the service-account email as Editor."
-        )
+            "The configured Google Shared Drive folder ID could not be opened. "
+            "Confirm [gdrive] root_folder_id is correct and the service account is a Content manager."
+        ) from exc
+
     ar = _find_folder(AR_FOLDER_NAME, root["id"]) or _create_folder(AR_FOLDER_NAME, root["id"])
     revenue = _find_folder(REVENUE_FOLDER_NAME, root["id"]) or _create_folder(REVENUE_FOLDER_NAME, root["id"])
     return {"root": root["id"], "ar": ar["id"], "revenue": revenue["id"]}
