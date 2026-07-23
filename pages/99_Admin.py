@@ -16,14 +16,36 @@ from utils.data import (
     delete_ar_snapshots,
     sync_current_ar_from_latest,
 )
-from utils.paths import CURRENT_AR_PATH, AR_SNAPSHOT_DIR
+from utils.paths import CURRENT_AR_PATH, AR_SNAPSHOT_DIR, REVENUE_HISTORY_PATH
 from utils.ui import format_money, page_header, section, footer
+from utils.google_drive import (
+    connection_test,
+    delete_file as delete_drive_file,
+    list_folder as list_drive_folder,
+    sync_from_drive,
+    upload_file as upload_drive_file,
+)
 
 page_header(
     "Administration",
     "Upload weekly NetSuite exports, validate results, and manage Revenue history and AR snapshots.",
     badge="Data Ops",
 )
+
+cloud_ok, cloud_message = connection_test()
+status_col, sync_col = st.columns([4, 1])
+with status_col:
+    if cloud_ok:
+        st.success("Google Drive: Connected")
+    else:
+        st.error(f"Google Drive: {cloud_message}")
+with sync_col:
+    if st.button("Sync from Drive", disabled=not cloud_ok, use_container_width=True):
+        with st.spinner("Downloading shared portal data..."):
+            result = sync_from_drive()
+        st.session_state["drive_initial_sync_complete"] = True
+        st.success(f"Synced {result['ar_snapshots']} AR snapshot(s) and Revenue history.")
+        st.rerun()
 
 snapshot_date = st.date_input(
     "AR Reporting / Snapshot Date",
@@ -53,7 +75,11 @@ with ar_tab:
                 AR_SNAPSHOT_DIR.mkdir(parents=True, exist_ok=True)
                 ar_df.to_csv(ar_target, index=False)
                 sync_current_ar_from_latest()
-                st.success("AR snapshot saved. Existing historical snapshots were preserved.")
+                try:
+                    upload_drive_file(ar_target, "ar")
+                    st.success("AR snapshot saved to Google Drive and is now shared across computers.")
+                except Exception as exc:
+                    st.error(f"Saved locally, but Google Drive upload failed: {exc}")
             st.download_button("Download Cleaned AR Excel", convert_df_to_excel(ar_df), "cleaned_ar_report.xlsx")
             st.dataframe(ar_df.head(200), width="stretch", hide_index=True)
         except Exception as exc:
@@ -83,8 +109,18 @@ with ar_tab:
         ):
             deleted, latest = delete_ar_snapshots(delete_dates)
             if deleted:
+                cloud_errors = []
+                for deleted_date in deleted:
+                    remote_name = f"ar_{pd.Timestamp(deleted_date):%Y-%m-%d}.csv"
+                    try:
+                        delete_drive_file("ar", remote_name)
+                    except Exception as exc:
+                        cloud_errors.append(f"{remote_name}: {exc}")
                 latest_text = pd.Timestamp(latest).strftime("%b %d, %Y") if latest is not None else "None remaining"
-                st.success(f"Deleted {len(deleted)} selected AR snapshot(s). Current snapshot is now {latest_text}.")
+                if cloud_errors:
+                    st.warning("Local snapshots were deleted, but some Drive deletions failed: " + "; ".join(cloud_errors))
+                else:
+                    st.success(f"Deleted {len(deleted)} selected AR snapshot(s) from Google Drive. Current snapshot is now {latest_text}.")
                 st.rerun()
         st.dataframe(
             inventory,
@@ -94,9 +130,9 @@ with ar_tab:
                 "As of Date": st.column_config.DateColumn("As of Date", format="MMM DD, YYYY"),
                 "Rows": st.column_config.NumberColumn("Rows", format="%d"),
                 "Customers": st.column_config.NumberColumn("Customers", format="%d"),
-                "Total AR": st.column_config.NumberColumn("Total AR", format="$%.2f"),
-                "Current": st.column_config.NumberColumn("Current", format="$%.2f"),
-                "Past Due": st.column_config.NumberColumn("Past Due", format="$%.2f"),
+                "Total AR": st.column_config.NumberColumn("Total AR", format="$%,.2f"),
+                "Current": st.column_config.NumberColumn("Current", format="$%,.2f"),
+                "Past Due": st.column_config.NumberColumn("Past Due", format="$%,.2f"),
             },
         )
 
@@ -160,10 +196,14 @@ with revenue_tab:
             if st.button(button_label, type="primary", key="save_revenue_history"):
                 combined, duplicate_weeks, added_weeks = merge_revenue_history(history, rev_df, replace=replace)
                 save_revenue_history(combined)
-                if duplicate_weeks and not replace:
-                    st.success(f"Added {len(added_weeks)} new week(s). Existing duplicate week(s) were skipped.")
-                else:
-                    st.success("Revenue history saved successfully.")
+                try:
+                    upload_drive_file(REVENUE_HISTORY_PATH, "revenue", "revenue_history.csv")
+                    if duplicate_weeks and not replace:
+                        st.success(f"Added {len(added_weeks)} new week(s) and saved to Google Drive. Existing duplicate week(s) were skipped.")
+                    else:
+                        st.success("Revenue history saved to Google Drive and is now shared across computers.")
+                except Exception as exc:
+                    st.error(f"Revenue was saved locally, but Google Drive upload failed: {exc}")
                 st.rerun()
 
             st.download_button("Download Cleaned Revenue Excel", convert_df_to_excel(rev_df), "cleaned_revenue_report.xlsx")
@@ -180,14 +220,19 @@ with revenue_tab:
         delete_weeks = st.multiselect("Weeks to Delete", options=weeks, format_func=lambda w: revenue_week_label(w, include_range=True), key="delete_revenue_weeks")
         confirm = st.checkbox("I understand these weeks will be removed from Revenue history.")
         if st.button("Delete Selected Weeks", disabled=not (delete_weeks and confirm), key="delete_weeks_button"):
-            save_revenue_history(delete_revenue_weeks(history, delete_weeks))
-            st.success("Selected Revenue week(s) deleted.")
+            revised = delete_revenue_weeks(history, delete_weeks)
+            save_revenue_history(revised)
+            try:
+                upload_drive_file(REVENUE_HISTORY_PATH, "revenue", "revenue_history.csv")
+                st.success("Selected Revenue week(s) deleted and Google Drive was updated.")
+            except Exception as exc:
+                st.error(f"Revenue history was updated locally, but Google Drive upload failed: {exc}")
             st.rerun()
         week_counts = revenue_week_table(history)
         st.dataframe(week_counts, width="stretch", hide_index=True, column_config={
-            "Revenue": st.column_config.NumberColumn("Revenue", format="$%.2f"),
+            "Revenue": st.column_config.NumberColumn("Revenue", format="$%,.2f"),
             "Lbs": st.column_config.NumberColumn("Lbs", format="%.1f"),
-            "Weighted $/LB": st.column_config.NumberColumn("Weighted $/LB", format="$%.2f"),
+            "Weighted $/LB": st.column_config.NumberColumn("Weighted $/LB", format="$%,.2f"),
         })
     else:
         st.info("No weeks are available to manage.")

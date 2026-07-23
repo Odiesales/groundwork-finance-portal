@@ -4,6 +4,7 @@ import streamlit as st
 from utils.paths import CURRENT_AR_PATH
 from utils.data import ar_snapshot_files
 from utils.ui import inject_global_css, sidebar_snapshot
+from utils.google_drive import sync_from_drive
 
 st.set_page_config(
     page_title="Groundwork Coffee Roasters Finance Portal",
@@ -27,6 +28,16 @@ def current_snapshot_date():
     return None
 
 inject_global_css()
+
+# Pull the shared cloud copy once per browser session. Uploads still work locally
+# if Google Drive is temporarily unavailable; Admin shows the connection error.
+if "drive_initial_sync_complete" not in st.session_state:
+    try:
+        sync_from_drive()
+        st.session_state["drive_initial_sync_complete"] = True
+        st.session_state.pop("drive_initial_sync_error", None)
+    except Exception as exc:
+        st.session_state["drive_initial_sync_error"] = str(exc)
 
 pages = [
     st.Page("pages/0_Executive_Scorecard.py", title="Executive Scorecard", icon="🏠", default=True),
