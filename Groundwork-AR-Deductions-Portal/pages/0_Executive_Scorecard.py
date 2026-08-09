@@ -207,15 +207,21 @@ else:
     increases = movement.nlargest(8, "WoW Change")
     reductions = movement.nsmallest(8, "WoW Change")
     c1, c2 = st.columns(2, gap="large")
-    with c1:
-        section("Largest Increases")
-       st.dataframe(
-    style_money_table(increases),
-    use_container_width=True,
-    hide_index=True,
-)
-    with c2:
-        section("Largest Reductions")
-        st.dataframe(style_money_table(reductions), use_container_width=true, hide_index=True)
+
+with c1:
+    section("Largest Increases")
+    st.dataframe(
+        style_money_table(increases),
+        use_container_width=True,
+        hide_index=True,
+    )
+
+with c2:
+    section("Largest Reductions")
+    st.dataframe(
+        style_money_table(reductions),
+        use_container_width=True,
+        hide_index=True,
+    )
 
 footer()
