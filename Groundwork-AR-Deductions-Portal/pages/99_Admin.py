@@ -67,7 +67,7 @@ if ar_file:
             except Exception as exc:
                 st.error(f"Saved locally, but Google Drive upload failed: {exc}")
         st.download_button("Download Cleaned AR Excel", convert_df_to_excel(ar_df), "cleaned_ar_report.xlsx")
-        st.dataframe(ar_df.head(200), width="stretch", hide_index=True)
+        st.dataframe(ar_df.head(200), use_container_width=True, hide_index=True)
     except Exception as exc:
         st.error(f"Could not process AR file: {exc}")
 

@@ -129,11 +129,11 @@ def render_table(df, money_cols=None, integer_cols=None, max_height=560):
             styler = styler.map(highlight_status, subset=[col])
 
     st.dataframe(
-        styler,
-        width='stretch',
-        hide_index=True,
-        height=min(max_height, max(120, 38 * (len(display) + 1))),
-        column_config=column_config,
+    exposure_table.style.format(...),
+    use_container_width=True,
+    hide_index=True,
+    ...
+)
     )
 
 
@@ -347,7 +347,7 @@ exposure_table.insert(0, "Rank", range(1, len(exposure_table) + 1))
 exposure_table["% of Total AR"] = exposure_table["Total AR"].div(total_ar).fillna(0)
 st.dataframe(
     exposure_table.style.format({"Past Due": "${:,.2f}", "Total AR": "${:,.2f}", "% of Total AR": "{:.2%}"}),
-    width="stretch", hide_index=True, height=min(760, max(160, 38 * (len(exposure_table) + 1))),
+    use_container_width=True, hide_index=True, height=min(760, max(160, 38 * (len(exposure_table) + 1))),
     column_config={"Rank": st.column_config.NumberColumn("Rank", format="%d")},
 )
 section_end()
@@ -411,7 +411,7 @@ fig.update_layout(
     yaxis=dict(automargin=True, tickfont=dict(size=13, color="#111827"), title_font=dict(size=15, color="#111827"), tickformat="$,.2f", gridcolor="#d7dce3", linecolor="#111827"),
     showlegend=False,
 )
-st.plotly_chart(fig, width='stretch', theme=None)
+st.plotly_chart(fig, use_container_width=True, theme=None)
 
 st.markdown("### Aging by Channel by Bucket")
 channel_matrix = pd.pivot_table(df, index=channel_col, columns="Bucket", values="Open Balance", aggfunc="sum", fill_value=0)

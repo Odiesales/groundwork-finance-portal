@@ -124,7 +124,7 @@ st.caption(f"Selected AR snapshot: {as_of:%B %d, %Y} · Sales denominator throug
 section("DSO Trend", "Each point aligns the AR snapshot, sales cutoff, and elapsed day count to the same as-of date.")
 fig = go.Figure(go.Scatter(x=history["Month"], y=history["DSO"], mode="lines+markers+text", text=[f"{v:.0f}" if pd.notna(v) else "" for v in history["DSO"]], textposition="top center", line=dict(color=YELLOW, width=3), marker=dict(size=8)))
 fig.update_yaxes(title="DSO (Days)")
-st.plotly_chart(chart_layout(fig, height=360), width="stretch")
+st.plotly_chart(chart_layout(fig, height=360), use_container_width=True)
 
 section("DSO by Channel", "Four-channel Finance view using the same aligned as-of methodology.")
 rows = []
@@ -155,7 +155,7 @@ customer["Sales Through As Of"] = pd.to_numeric(customer["Sales Through As Of"],
 customer["DSO"] = customer.apply(lambda r: dso(r["Open Balance"], r["Sales Through As Of"], elapsed_days), axis=1)
 customer = customer.sort_values(["DSO", "Open Balance"], ascending=[False, False], na_position="first")
 show = customer[["Reporting Customer", "Open Balance", "Sales Through As Of", "DSO"]].rename(columns={"Reporting Customer":"Customer"})
-st.dataframe(show, width="stretch", hide_index=True, height=520, column_config={"Open Balance":st.column_config.NumberColumn("Open AR", format="$%,.2f"), "Sales Through As Of":st.column_config.NumberColumn("Sales Through As Of", format="$%,.2f"), "DSO":st.column_config.NumberColumn("DSO (Days)", format="%.0f")})
+st.dataframe(show, use_container_width=True, hide_index=True, height=520, column_config={"Open Balance":st.column_config.NumberColumn("Open AR", format="$%,.2f"), "Sales Through As Of":st.column_config.NumberColumn("Sales Through As Of", format="$%,.2f"), "DSO":st.column_config.NumberColumn("DSO (Days)", format="%.0f")})
 
 st.caption("DSO formula: Net AR / sales through the AR snapshot date x elapsed calendar days in that month. This prevents partial-month sales from being multiplied by a full-month day count.")
 footer()

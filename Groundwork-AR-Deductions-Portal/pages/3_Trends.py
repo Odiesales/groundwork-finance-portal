@@ -36,7 +36,7 @@ fig = go.Figure()
 for metric in ["Total AR", "Current", "Past Due"]:
     fig.add_trace(go.Scatter(x=hist["As of Date"], y=hist[metric], mode="lines+markers", name=metric))
 fig.update_yaxes(title="Open AR", tickformat="$,.0f")
-st.plotly_chart(chart_layout(fig, height=380), width="stretch")
+st.plotly_chart(chart_layout(fig, height=380), use_container_width=True)
 
 section("AR Snapshot Comparison", "Pick any two saved as-of dates and compare Total AR, Current, and Past Due.")
 c1, c2 = st.columns(2)
@@ -66,5 +66,5 @@ st.dataframe(
 section("AR Snapshot History", "All saved AR snapshots, newest first.")
 display_hist = hist.sort_values("As of Date", ascending=False).copy()
 st.download_button("⇩ Export AR History", display_hist.to_csv(index=False).encode("utf-8"), "AR_History.csv", "text/csv")
-st.dataframe(display_hist, width="stretch", hide_index=True, column_config={"As of Date":st.column_config.DateColumn("As of Date", format="MMM DD, YYYY"), "Total AR":st.column_config.NumberColumn("Total AR", format="$%,.2f"), "Current":st.column_config.NumberColumn("Current", format="$%,.2f"), "Past Due":st.column_config.NumberColumn("Past Due", format="$%,.2f"), "WoW Change":st.column_config.NumberColumn("WoW Change", format="$%,.2f")})
+st.dataframe(display_hist, use_container_width=True, hide_index=True, column_config={"As of Date":st.column_config.DateColumn("As of Date", format="MMM DD, YYYY"), "Total AR":st.column_config.NumberColumn("Total AR", format="$%,.2f"), "Current":st.column_config.NumberColumn("Current", format="$%,.2f"), "Past Due":st.column_config.NumberColumn("Past Due", format="$%,.2f"), "WoW Change":st.column_config.NumberColumn("WoW Change", format="$%,.2f")})
 footer()

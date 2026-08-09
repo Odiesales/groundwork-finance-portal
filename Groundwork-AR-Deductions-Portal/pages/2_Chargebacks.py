@@ -157,7 +157,11 @@ style = matrix.style.format('${:,.2f}').apply(
     lambda row: ['font-weight: 700' if row.name == 'Grand Total' else '' for _ in row],
     axis=1,
 )
-st.dataframe(style, width='stretch', height=min(520, 74 + 35*len(matrix)))
+st.dataframe(
+    style,
+    use_container_width=True,
+    height=min(520, 74 + 35 * len(matrix))
+)
 
 c1,c2 = st.columns([1,1], gap='large')
 with c1:
