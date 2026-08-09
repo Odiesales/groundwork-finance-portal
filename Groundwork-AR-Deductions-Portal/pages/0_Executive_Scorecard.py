@@ -183,8 +183,16 @@ watchlist["Priority"] = np.select(
 )
 watchlist = watchlist.sort_values(["90+ Balance", "Past Due"], ascending=False).head(12)
 st.dataframe(
-    watchlist.style.format({"Open Balance":"${:,.2f}", "Past Due":"${:,.2f}", "90+ Balance":"${:,.2f}", "Past Due %":"{:.1%}"}),
-    width='stretch', hide_index=True,
+    watchlist.style.format(
+        {
+            "Open Balance": "${:,.2f}",
+            "Past Due": "${:,.2f}",
+            "90+ Balance": "${:,.2f}",
+            "Past Due %": "{:.1%}",
+        }
+    ),
+    use_container_width=True,
+    hide_index=True,
 )
 
 section("Largest Customer Changes", "Week-over-week movement by customer.")
