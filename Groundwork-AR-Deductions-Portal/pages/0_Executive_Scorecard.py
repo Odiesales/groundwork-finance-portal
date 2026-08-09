@@ -209,9 +209,13 @@ else:
     c1, c2 = st.columns(2, gap="large")
     with c1:
         section("Largest Increases")
-        st.dataframe(style_money_table(increases), width='stretch', hide_index=True)
+       st.dataframe(
+    style_money_table(increases),
+    use_container_width=True,
+    hide_index=True,
+)
     with c2:
         section("Largest Reductions")
-        st.dataframe(style_money_table(reductions), width='stretch', hide_index=True)
+        st.dataframe(style_money_table(reductions), use_container_width=true, hide_index=True)
 
 footer()
