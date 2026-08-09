@@ -1,5 +1,12 @@
+import sys
+from pathlib import Path
+
 import pandas as pd
 import streamlit as st
+
+APP_DIR = Path(__file__).resolve().parent
+if str(APP_DIR) not in sys.path:
+    sys.path.insert(0, str(APP_DIR))
 
 from utils.paths import CURRENT_AR_PATH
 from utils.data import ar_snapshot_files
