@@ -7,11 +7,12 @@ from utils.ui import inject_global_css, sidebar_snapshot
 from utils.google_drive import sync_from_drive
 
 st.set_page_config(
-    page_title="Groundwork Coffee Roasters Finance Portal",
+    page_title="Groundwork AR & Deductions Portal",
     page_icon="☕",
     layout="wide",
     initial_sidebar_state="expanded",
 )
+
 
 def current_snapshot_date():
     snapshots = ar_snapshot_files()
@@ -27,10 +28,9 @@ def current_snapshot_date():
         pass
     return None
 
+
 inject_global_css()
 
-# Pull the shared cloud copy once per browser session. Uploads still work locally
-# if Google Drive is temporarily unavailable; Admin shows the connection error.
 if "drive_initial_sync_complete" not in st.session_state:
     try:
         sync_from_drive()
@@ -41,10 +41,11 @@ if "drive_initial_sync_complete" not in st.session_state:
 
 pages = [
     st.Page("pages/0_Executive_Scorecard.py", title="Executive Scorecard", icon="🏠", default=True),
+    st.Page("pages/1_DSO.py", title="DSO", icon="⏱️"),
     st.Page("pages/1_Accounts_Receivable.py", title="Accounts Receivable", icon="💰"),
     st.Page("pages/2_Chargebacks.py", title="Chargebacks", icon="🏷️"),
-    st.Page("pages/2_Revenue.py", title="Weekly Revenue Report", icon="📈"),
-    st.Page("pages/3_Trends.py", title="Trends", icon="📊"),
+    st.Page("pages/2_Chargeback_Analysis.py", title="CB Analysis", icon="🔎"),
+    st.Page("pages/3_Trends.py", title="AR Trends", icon="📊"),
     st.Page("pages/99_Admin.py", title="Administration", icon="⚙️"),
 ]
 

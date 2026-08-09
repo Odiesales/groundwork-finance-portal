@@ -128,18 +128,36 @@ if not hist.empty:
     if deduction: hist = hist[hist['Deduction Type'].isin(deduction)]
     if rep: hist = hist[hist['Sales Rep: Name'].astype(str).isin(rep)]
     if bucket: hist = hist[hist['Bucket'].astype(str).isin(bucket)]
+    # Use only the latest saved snapshot within each month. Weekly snapshots are
+    # point-in-time balances and must never be added together as activity.
+    hist = hist.dropna(subset=['Snapshot Date']).copy()
+    hist['Snapshot Month'] = hist['Snapshot Date'].dt.to_period('M')
+    latest_in_month = hist.groupby('Snapshot Month')['Snapshot Date'].transform('max')
+    hist = hist[hist['Snapshot Date'].eq(latest_in_month)].copy()
     hist['As Of'] = hist['Snapshot Date'].dt.strftime('%b-%y')
     matrix = pd.pivot_table(hist, index='Deduction Type', columns='As Of', values='Open Balance', aggfunc='sum', fill_value=0)
+    month_order = (
+        hist[['As Of', 'Snapshot Date']]
+        .drop_duplicates()
+        .sort_values('Snapshot Date', ascending=False)['As Of']
+        .tolist()
+    )
+    matrix = matrix.reindex(columns=[c for c in month_order if c in matrix.columns])
 else:
     matrix = pd.DataFrame()
 
 if matrix.empty:
-    matrix = base.groupby('Deduction Type', dropna=False)['Open Balance'].sum().to_frame('As Of Balance')
-# chronological month/snapshot ordering where possible
-matrix['As of Total'] = matrix.iloc[:, :].sum(axis=1)
-matrix = matrix.sort_values('As of Total', ascending=False)
+    matrix = base.groupby('Deduction Type', dropna=False)['Open Balance'].sum().to_frame('Current Open')
+
+# Sort by the newest visible snapshot only; do not create an As of Total column.
+latest_col = matrix.columns[0]
+matrix = matrix.sort_values(latest_col, ascending=False)
 matrix.loc['Grand Total'] = matrix.sum(axis=0)
-st.dataframe(matrix.style.format('${:,.2f}'), width='stretch', height=min(520, 74 + 35*len(matrix)))
+style = matrix.style.format('${:,.2f}').apply(
+    lambda row: ['font-weight: 700' if row.name == 'Grand Total' else '' for _ in row],
+    axis=1,
+)
+st.dataframe(style, width='stretch', height=min(520, 74 + 35*len(matrix)))
 
 c1,c2 = st.columns([1,1], gap='large')
 with c1:
@@ -147,16 +165,20 @@ with c1:
     top = base.groupby('Reporting Customer')['Open Balance'].sum().sort_values(ascending=False)
     if chart_limit is not None: top = top.head(chart_limit)
     top = top.sort_values()
-    fig = go.Figure(go.Bar(x=top.values, y=top.index, orientation='h', marker_color=YELLOW, text=[format_money(v,2) for v in top.values], textposition='inside', insidetextanchor='middle'))
-    fig.update_xaxes(tickformat='$,.2f')
+    max_value = float(top.max()) if not top.empty else 0
+    positions = ['inside' if max_value and float(v) >= max_value * 0.35 else 'outside' for v in top.values]
+    fig = go.Figure(go.Bar(x=top.values, y=top.index, orientation='h', marker_color=YELLOW, text=[format_money(v,2) for v in top.values], textposition=positions, insidetextanchor='end', cliponaxis=False, textfont=dict(color='#171717', size=11)))
+    fig.update_xaxes(tickformat='$,.2f', range=[0, max_value * 1.25 if max_value else 1])
     st.plotly_chart(chart_layout(fig, height=390), width='stretch')
 with c2:
     section('Open Balance by Deduction Type', 'Current balance distribution, not YTD activity.')
     by_type = base.groupby('Deduction Type')['Open Balance'].sum().sort_values(ascending=False)
     if chart_limit is not None: by_type = by_type.head(chart_limit)
     by_type = by_type.sort_values()
-    fig = go.Figure(go.Bar(x=by_type.values, y=by_type.index, orientation='h', marker_color=YELLOW, text=[format_money(v,2) for v in by_type.values], textposition='inside', insidetextanchor='middle'))
-    fig.update_xaxes(tickformat='$,.2f')
+    max_value = float(by_type.max()) if not by_type.empty else 0
+    positions = ['inside' if max_value and float(v) >= max_value * 0.35 else 'outside' for v in by_type.values]
+    fig = go.Figure(go.Bar(x=by_type.values, y=by_type.index, orientation='h', marker_color=YELLOW, text=[format_money(v,2) for v in by_type.values], textposition=positions, insidetextanchor='end', cliponaxis=False, textfont=dict(color='#171717', size=11)))
+    fig.update_xaxes(tickformat='$,.2f', range=[0, max_value * 1.25 if max_value else 1])
     st.plotly_chart(chart_layout(fig, height=390), width='stretch')
 
 st.download_button('⇩ Export Selected Chargebacks', base.to_csv(index=False).encode('utf-8'), f'Chargebacks_{as_of:%Y-%m-%d}.csv' if as_of is not None else 'Chargebacks.csv', 'text/csv')

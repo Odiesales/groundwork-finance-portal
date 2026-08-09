@@ -1,0 +1,8 @@
+GROUNDWORK FINANCE PORTAL v3.0.4
+
+Important:
+1. Upload the CONTENTS of this folder to the root of the GitHub repository.
+2. app.py, requirements.txt, runtime.txt, pages, utils, assets, and data must all be visible at the repository root.
+3. This package includes Revenue history but does not include a current AR export or AR snapshots.
+4. After deployment, open Administration and upload/save an AR Aging report. Executive, Accounts Receivable, and Chargebacks will remain empty until that is done.
+5. Streamlit entrypoint: app.py
