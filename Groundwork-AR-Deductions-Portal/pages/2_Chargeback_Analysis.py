@@ -94,7 +94,14 @@ for customer, grp in current.groupby("Reporting Customer"):
         "Oldest": grp["Age"].max(),
     })
 attention = pd.DataFrame(customer_rows).sort_values("Open CB", ascending=False)
-st.dataframe(attention, width="stretch", hide_index=True, height=440, column_config={
+st.dataframe(
+    inventory,
+    use_container_width=True,
+    hide_index=True,
+    column_config={
+        # keep your existing column_config contents here
+    },
+)
     "Open CB": st.column_config.NumberColumn("Open CB", format="$%,.2f"),
     "% of CB": st.column_config.NumberColumn("% of CB", format="%.1f%%"),
     "Avg Age": st.column_config.NumberColumn("Avg Age", format="%.0f"),

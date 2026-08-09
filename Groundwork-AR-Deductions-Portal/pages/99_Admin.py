@@ -98,7 +98,14 @@ else:
         else:
             st.success(f"Deleted {len(deleted)} selected AR snapshot(s).")
         st.rerun()
-    st.dataframe(inventory, width="stretch", hide_index=True, column_config={
+    st.dataframe(
+    inventory,
+    use_container_width=True,
+    hide_index=True,
+    column_config={
+        # keep your existing column_config contents here
+    },
+)
         "As of Date": st.column_config.DateColumn("As of Date", format="MMM DD, YYYY"),
         "Rows": st.column_config.NumberColumn("Rows", format="%d"),
         "Customers": st.column_config.NumberColumn("Customers", format="%d"),

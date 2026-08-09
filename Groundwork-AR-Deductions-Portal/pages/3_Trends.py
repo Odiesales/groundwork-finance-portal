@@ -54,7 +54,14 @@ comparison = pd.DataFrame(rows)
 st.download_button("⇩ Export AR Comparison", comparison.to_csv(index=False).encode("utf-8"), "AR_Snapshot_Comparison.csv", "text/csv")
 amount_cols = [c for c in comparison.columns if c not in ["Metric", "Change %"]]
 config = {c:st.column_config.NumberColumn(c, format="$%,.2f") for c in amount_cols}; config["Change %"] = st.column_config.NumberColumn("Change %", format="%.2f%%")
-st.dataframe(comparison, width="stretch", hide_index=True, column_config=config)
+st.dataframe(
+    inventory,
+    use_container_width=True,
+    hide_index=True,
+    column_config={
+        # keep your existing column_config contents here
+    },
+)
 
 section("AR Snapshot History", "All saved AR snapshots, newest first.")
 display_hist = hist.sort_values("As of Date", ascending=False).copy()

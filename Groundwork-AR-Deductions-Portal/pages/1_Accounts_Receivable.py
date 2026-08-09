@@ -445,5 +445,12 @@ render_table(terms_matrix, money_cols=BUCKET_ORDER + ["Grand Total"], max_height
 section_end()
 
 with st.expander("Transaction Detail"):
-    st.dataframe(df, width='stretch', hide_index=True, height=620)
+    st.dataframe(
+    inventory,
+    use_container_width=True,
+    hide_index=True,
+    column_config={
+        # keep your existing column_config contents here
+    },
+)
 footer()
