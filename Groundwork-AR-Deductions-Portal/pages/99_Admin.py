@@ -27,7 +27,10 @@ page_header(
 cloud_ok, cloud_message = connection_test()
 status_col, sync_col = st.columns([4, 1])
 with status_col:
-    st.success("Google Drive: Connected") if cloud_ok else st.error(f"Google Drive: {cloud_message}")
+    if cloud_ok:
+        st.success("Google Drive: Connected")
+    else:
+        st.error(f"Google Drive: {cloud_message}")
 with sync_col:
     if st.button("Sync from Drive", disabled=not cloud_ok, use_container_width=True):
         with st.spinner("Downloading shared AR and DSO sales-feed data..."):
