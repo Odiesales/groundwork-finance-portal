@@ -58,4 +58,4 @@ pages = [
 
 nav = st.navigation(pages, position="sidebar")
 sidebar_snapshot(current_snapshot_date())
-_ = nav.run()
+nav.run()
