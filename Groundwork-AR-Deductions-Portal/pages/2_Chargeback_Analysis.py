@@ -63,14 +63,54 @@ c1, c2 = st.columns(2, gap="large")
 with c1:
     section("Top Customer Exposure", "Customers with the largest open deduction balances.")
     top = largest_customer.head(10).sort_values()
-    fig = go.Figure(go.Bar(x=top.values, y=top.index, orientation="h", marker_color=YELLOW, text=[format_money(v, 2) for v in top.values], textposition="inside"))
-    fig.update_xaxes(tickformat="$,.2f")
+    max_value = float(top.max()) if not top.empty else 0
+    positions = [
+        "inside" if max_value and float(v) >= max_value * 0.30 else "outside"
+        for v in top.values
+    ]
+    fig = go.Figure(
+        go.Bar(
+            x=top.values,
+            y=top.index,
+            orientation="h",
+            marker_color=YELLOW,
+            text=[format_money(v, 2) for v in top.values],
+            textposition=positions,
+            insidetextanchor="end",
+            cliponaxis=False,
+            textfont=dict(color="#171717", size=11),
+        )
+    )
+    fig.update_xaxes(
+        tickformat="$,.2f",
+        range=[0, max_value * 1.28 if max_value else 1],
+    )
     st.plotly_chart(chart_layout(fig, height=380), width="stretch")
 with c2:
     section("Deduction Mix", "Current open balance by deduction type.")
     mix = largest_type.head(10).sort_values()
-    fig = go.Figure(go.Bar(x=mix.values, y=mix.index, orientation="h", marker_color=YELLOW, text=[format_money(v, 2) for v in mix.values], textposition="inside"))
-    fig.update_xaxes(tickformat="$,.2f")
+    max_value = float(mix.max()) if not mix.empty else 0
+    positions = [
+        "inside" if max_value and float(v) >= max_value * 0.30 else "outside"
+        for v in mix.values
+    ]
+    fig = go.Figure(
+        go.Bar(
+            x=mix.values,
+            y=mix.index,
+            orientation="h",
+            marker_color=YELLOW,
+            text=[format_money(v, 2) for v in mix.values],
+            textposition=positions,
+            insidetextanchor="end",
+            cliponaxis=False,
+            textfont=dict(color="#171717", size=11),
+        )
+    )
+    fig.update_xaxes(
+        tickformat="$,.2f",
+        range=[0, max_value * 1.28 if max_value else 1],
+    )
     st.plotly_chart(chart_layout(fig, height=380), width="stretch")
 
 section("Open Chargeback Trend", "Month-end proxy uses the latest saved AR snapshot within each month; snapshots are never added together.")
@@ -94,15 +134,15 @@ for customer, grp in current.groupby("Reporting Customer"):
         "Oldest": grp["Age"].max(),
     })
 attention = pd.DataFrame(customer_rows).sort_values("Open CB", ascending=False)
+attention_style = attention.style.format({
+    "Open CB": "${:,.2f}",
+    "% of CB": "{:.1f}%",
+    "Avg Age": "{:,.0f}",
+    "Oldest": "{:,.0f}",
+})
 st.dataframe(
-    attention,
+    attention_style,
     use_container_width=True,
     hide_index=True,
-    column_config={
-        "Open CB": st.column_config.NumberColumn("Open CB", format="dollar"),
-        "% of CB": st.column_config.NumberColumn("% of CB", format="%.1f%%"),
-        "Avg Age": st.column_config.NumberColumn("Avg Age", format="%.0f"),
-        "Oldest": st.column_config.NumberColumn("Oldest", format="%.0f"),
-    },
 )
 footer()

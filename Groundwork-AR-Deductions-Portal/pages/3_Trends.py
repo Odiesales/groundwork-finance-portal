@@ -53,7 +53,7 @@ for metric in ["Total AR", "Current", "Past Due"]:
 comparison = pd.DataFrame(rows)
 st.download_button("⇩ Export AR Comparison", comparison.to_csv(index=False).encode("utf-8"), "AR_Snapshot_Comparison.csv", "text/csv")
 amount_cols = [c for c in comparison.columns if c not in ["Metric", "Change %"]]
-config = {c:st.column_config.NumberColumn(c, format="dollar") for c in amount_cols}; config["Change %"] = st.column_config.NumberColumn("Change %", format="%.2f%%")
+config = {c:st.column_config.NumberColumn(c, format="$%.2f") for c in amount_cols}; config["Change %"] = st.column_config.NumberColumn("Change %", format="%.2f%%")
 st.dataframe(
     comparison,
     use_container_width=True,
@@ -64,5 +64,5 @@ st.dataframe(
 section("AR Snapshot History", "All saved AR snapshots, newest first.")
 display_hist = hist.sort_values("As of Date", ascending=False).copy()
 st.download_button("⇩ Export AR History", display_hist.to_csv(index=False).encode("utf-8"), "AR_History.csv", "text/csv")
-st.dataframe(display_hist, use_container_width=True, hide_index=True, column_config={"As of Date":st.column_config.DateColumn("As of Date", format="MMM DD, YYYY"), "Total AR":st.column_config.NumberColumn("Total AR", format="dollar"), "Current":st.column_config.NumberColumn("Current", format="dollar"), "Past Due":st.column_config.NumberColumn("Past Due", format="dollar"), "WoW Change":st.column_config.NumberColumn("WoW Change", format="dollar")})
+st.dataframe(display_hist, use_container_width=True, hide_index=True, column_config={"As of Date":st.column_config.DateColumn("As of Date", format="MMM DD, YYYY"), "Total AR":st.column_config.NumberColumn("Total AR", format="$%.2f"), "Current":st.column_config.NumberColumn("Current", format="$%.2f"), "Past Due":st.column_config.NumberColumn("Past Due", format="$%.2f"), "WoW Change":st.column_config.NumberColumn("WoW Change", format="$%.2f")})
 footer()

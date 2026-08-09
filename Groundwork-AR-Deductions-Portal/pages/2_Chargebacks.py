@@ -195,7 +195,7 @@ st.dataframe(
     use_container_width=True,
     hide_index=True,
     column_config={
-        "Open Balance": st.column_config.NumberColumn("Open Balance", format="dollar"),
+        "Open Balance": st.column_config.NumberColumn("Open Balance", format="$%.2f"),
         "Age": st.column_config.NumberColumn("Age (Days)", format="%.0f"),
     },
 )

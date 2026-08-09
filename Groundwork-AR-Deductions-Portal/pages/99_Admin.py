@@ -98,18 +98,21 @@ else:
         else:
             st.success(f"Deleted {len(deleted)} selected AR snapshot(s).")
         st.rerun()
+    inventory_display = inventory.copy()
+    inventory_display["As of Date"] = pd.to_datetime(
+        inventory_display["As of Date"], errors="coerce"
+    ).dt.strftime("%b %d, %Y")
+    inventory_style = inventory_display.style.format({
+        "Rows": "{:,.0f}",
+        "Customers": "{:,.0f}",
+        "Total AR": "${:,.2f}",
+        "Current": "${:,.2f}",
+        "Past Due": "${:,.2f}",
+    })
     st.dataframe(
-        inventory,
+        inventory_style,
         use_container_width=True,
         hide_index=True,
-        column_config={
-            "As of Date": st.column_config.DateColumn("As of Date", format="MMM DD, YYYY"),
-            "Rows": st.column_config.NumberColumn("Rows", format="%d"),
-            "Customers": st.column_config.NumberColumn("Customers", format="%d"),
-            "Total AR": st.column_config.NumberColumn("Total AR", format="dollar"),
-            "Current": st.column_config.NumberColumn("Current", format="dollar"),
-            "Past Due": st.column_config.NumberColumn("Past Due", format="dollar"),
-        },
     )
 
 st.divider()
