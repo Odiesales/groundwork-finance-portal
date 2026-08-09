@@ -124,16 +124,17 @@ def render_table(df, money_cols=None, integer_cols=None, max_height=560):
         return ""
 
     styler = display.style
+    for col in ["Suggested Hold", "Priority"]:
+        if col in display.columns:
+            styler = styler.map(highlight_status, subset=[col])
 
-for col in ["Suggested Hold", "Priority"]:
-    if col in display.columns:
-        styler = styler.map(highlight_status, subset=[col])
-
-st.dataframe(
-    styler,
-    use_container_width=True,
-    hide_index=True,
-)
+    st.dataframe(
+        styler,
+        use_container_width=True,
+        hide_index=True,
+        height=min(max_height, 74 + 35 * len(display)),
+        column_config=column_config,
+    )
 
 options = snapshot_options()
 if not options:
@@ -443,12 +444,5 @@ render_table(terms_matrix, money_cols=BUCKET_ORDER + ["Grand Total"], max_height
 section_end()
 
 with st.expander("Transaction Detail"):
-    st.dataframe(
-    inventory,
-    use_container_width=True,
-    hide_index=True,
-    column_config={
-        # keep your existing column_config contents here
-    },
-)
+    st.dataframe(df, use_container_width=True, hide_index=True, height=620)
 footer()

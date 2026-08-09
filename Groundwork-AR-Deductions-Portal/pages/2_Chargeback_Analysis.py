@@ -95,16 +95,14 @@ for customer, grp in current.groupby("Reporting Customer"):
     })
 attention = pd.DataFrame(customer_rows).sort_values("Open CB", ascending=False)
 st.dataframe(
-    inventory,
+    attention,
     use_container_width=True,
     hide_index=True,
     column_config={
-        # keep your existing column_config contents here
+        "Open CB": st.column_config.NumberColumn("Open CB", format="$%,.2f"),
+        "% of CB": st.column_config.NumberColumn("% of CB", format="%.1f%%"),
+        "Avg Age": st.column_config.NumberColumn("Avg Age", format="%.0f"),
+        "Oldest": st.column_config.NumberColumn("Oldest", format="%.0f"),
     },
 )
-    "Open CB": st.column_config.NumberColumn("Open CB", format="$%,.2f"),
-    "% of CB": st.column_config.NumberColumn("% of CB", format="%.1f%%"),
-    "Avg Age": st.column_config.NumberColumn("Avg Age", format="%.0f"),
-    "Oldest": st.column_config.NumberColumn("Oldest", format="%.0f"),
-})
 footer()

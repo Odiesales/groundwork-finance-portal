@@ -140,10 +140,10 @@ if not channel_df.empty:
     display_channel = pd.concat([channel_df, grand], ignore_index=True)
     styler = display_channel.style.format({"Net AR":"${:,.2f}", "Sales Through As Of":"${:,.2f}", "DSO":lambda v: "N/M" if pd.isna(v) else f"{v:,.0f}"}).apply(lambda r: ["font-weight: 700" if r["Channel"] == "Grand Total" else "" for _ in r], axis=1)
     st.dataframe(
-    styler,
-    use_container_width=True,
-    hide_index=True,
-)
+        styler,
+        use_container_width=True,
+        hide_index=True,
+    )
 
 section("Customer DSO", "Customer open AR divided by customer sales through the same as-of date. N/M means sales are zero or unavailable.")
 ar_customer = ar_m.groupby(["Customer Key", "Reporting Customer"], dropna=False)["Open Balance"].sum().reset_index()
