@@ -108,7 +108,7 @@ def render_table(df, money_cols=None, integer_cols=None, max_height=560):
     for col in display.columns:
         if col in money_cols:
             display[col] = pd.to_numeric(display[col], errors="coerce").fillna(0.0)
-            column_config[col] = st.column_config.NumberColumn(col, format="$%.2f")
+            column_config[col] = st.column_config.NumberColumn(col, format="dollar")
         elif col in integer_cols:
             display[col] = pd.to_numeric(display[col], errors="coerce").fillna(0).astype(int)
             column_config[col] = st.column_config.NumberColumn(col, format="%d")

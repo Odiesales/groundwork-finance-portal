@@ -106,9 +106,9 @@ else:
             "As of Date": st.column_config.DateColumn("As of Date", format="MMM DD, YYYY"),
             "Rows": st.column_config.NumberColumn("Rows", format="%d"),
             "Customers": st.column_config.NumberColumn("Customers", format="%d"),
-            "Total AR": st.column_config.NumberColumn("Total AR", format="$%,.2f"),
-            "Current": st.column_config.NumberColumn("Current", format="$%,.2f"),
-            "Past Due": st.column_config.NumberColumn("Past Due", format="$%,.2f"),
+            "Total AR": st.column_config.NumberColumn("Total AR", format="dollar"),
+            "Current": st.column_config.NumberColumn("Current", format="dollar"),
+            "Past Due": st.column_config.NumberColumn("Past Due", format="dollar"),
         },
     )
 
