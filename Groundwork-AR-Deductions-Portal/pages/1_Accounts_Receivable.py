@@ -124,18 +124,16 @@ def render_table(df, money_cols=None, integer_cols=None, max_height=560):
         return ""
 
     styler = display.style
-    for col in ["Suggested Hold", "Priority"]:
-        if col in display.columns:
-            styler = styler.map(highlight_status, subset=[col])
 
-    st.dataframe(
-    exposure_table.style.format(...),
+for col in ["Suggested Hold", "Priority"]:
+    if col in display.columns:
+        styler = styler.map(highlight_status, subset=[col])
+
+st.dataframe(
+    styler,
     use_container_width=True,
     hide_index=True,
-    ...
 )
-    )
-
 
 options = snapshot_options()
 if not options:
