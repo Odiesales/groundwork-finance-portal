@@ -105,13 +105,16 @@ def render_table(df, money_cols=None, integer_cols=None, max_height=560):
 
     display = df.copy()
     column_config = {}
+    formatters = {}
     for col in display.columns:
         if col in money_cols:
             display[col] = pd.to_numeric(display[col], errors="coerce").fillna(0.0)
-            column_config[col] = st.column_config.NumberColumn(col, format="$%.2f")
+            # Pandas Styler is used for currency because Streamlit's printf-style
+            # NumberColumn format does not add thousands separators.
+            formatters[col] = "${:,.2f}"
         elif col in integer_cols:
             display[col] = pd.to_numeric(display[col], errors="coerce").fillna(0).astype(int)
-            column_config[col] = st.column_config.NumberColumn(col, format="%d")
+            formatters[col] = "{:,.0f}"
 
     def highlight_status(value):
         text = str(value)
@@ -123,7 +126,7 @@ def render_table(df, money_cols=None, integer_cols=None, max_height=560):
             return "color:#B54708;font-weight:800"
         return ""
 
-    styler = display.style
+    styler = display.style.format(formatters) if formatters else display.style
     for col in ["Suggested Hold", "Priority"]:
         if col in display.columns:
             styler = styler.map(highlight_status, subset=[col])
@@ -444,5 +447,15 @@ render_table(terms_matrix, money_cols=BUCKET_ORDER + ["Grand Total"], max_height
 section_end()
 
 with st.expander("Transaction Detail"):
-    st.dataframe(df, use_container_width=True, hide_index=True, height=620)
+    detail_display = df.copy()
+    detail_formats = {}
+    for col in ["Open Balance", "Amount", "Total AR", "Past Due"]:
+        if col in detail_display.columns:
+            detail_display[col] = pd.to_numeric(detail_display[col], errors="coerce")
+            detail_formats[col] = "${:,.2f}"
+    for col in ["Age", "Days Past Due"]:
+        if col in detail_display.columns:
+            detail_formats[col] = "{:,.0f}"
+    detail_styler = detail_display.style.format(detail_formats, na_rep="—")
+    st.dataframe(detail_styler, use_container_width=True, hide_index=True, height=620)
 footer()

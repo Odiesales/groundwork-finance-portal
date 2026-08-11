@@ -190,13 +190,13 @@ st.download_button('⇩ Export Selected Chargebacks', base.to_csv(index=False).e
 section('Chargeback Transactions (Detail)' if not view.startswith('Holdbacks') else 'Holdback Transactions (Detail)', 'Sortable detail supporting the balances above.')
 show_cols = [c for c in ['Date','Reporting Customer','Channel Clean','Transaction Type','Deduction Type','Document Number','Memo','Open Balance','Age','Bucket','Sales Rep: Name'] if c in base.columns]
 detail = base[show_cols].sort_values('Open Balance', ascending=False).rename(columns={'Reporting Customer':'Customer','Channel Clean':'Sales Channel','Document Number':'Invoice #'})
+detail_style = detail.style.format({
+    "Open Balance": "${:,.2f}",
+    "Age": "{:,.0f}",
+}, na_rep="—")
 st.dataframe(
-    detail,
+    detail_style,
     use_container_width=True,
     hide_index=True,
-    column_config={
-        "Open Balance": st.column_config.NumberColumn("Open Balance", format="$%.2f"),
-        "Age": st.column_config.NumberColumn("Age (Days)", format="%.0f"),
-    },
 )
 footer()
