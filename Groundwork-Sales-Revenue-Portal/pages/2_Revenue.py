@@ -292,7 +292,13 @@ def fmt_currency(value: object) -> str:
 def fmt_dso(value: object) -> str:
     if pd.isna(value):
         return "N/M"
-    return f"{float(value):.0f}"
+    return f"{float(value):,.0f}"
+
+
+def fmt_number_1(value: object) -> str:
+    if pd.isna(value):
+        return "N/M"
+    return f"{float(value):,.1f}"
 
 
 def finance_grid_html(row_defs: list[tuple[str, str, dict[pd.Timestamp, object]]], months: list[pd.Timestamp]) -> str:
@@ -434,6 +440,7 @@ if not dso_full.empty:
 
 # -----------------------------------------------------------------------------
 # Executive Summary
+# Display standard: currency $0,000.00; lbs/ratios 0,000.0; percentages 0.0%; counts 0,000; DSO whole days.
 # -----------------------------------------------------------------------------
 section(
     "Executive Summary",
@@ -447,7 +454,7 @@ prior_weighted = float(prior["Weighted $/LB"]) if prior is not None else 0.0
 four_avg = float(prior_four["Revenue"].mean()) if not prior_four.empty else 0.0
 metric_row([
     (f"Weekly Revenue • {delta_label(current_revenue, prior_revenue)}", format_money(current_revenue, 2)),
-    ("Eligible Coffee Lbs", format_number(current_lbs, 1)),
+    ("Eligible Coffee Lbs", fmt_number_1(current_lbs)),
     (f"Weighted $/LB • {delta_label(current_weighted, prior_weighted)}", format_money(current_weighted, 2)),
     ("Current Month Revenue", format_money(current_month_revenue, 2)),
     ("Prior Month Revenue", format_money(prior_month_revenue, 2)),
@@ -466,7 +473,7 @@ with st.container(border=True):
         if four_change is not None:
             position = "above" if four_change >= 0 else "below"
             st.markdown(f"- The selected week is **{abs(four_change):.1f}% {position}** the prior 4-week average of {format_money(four_avg, 0)}.")
-    st.markdown(f"- Wholesale weighted pricing is **{format_money(current_weighted, 2)}/lb** on **{format_number(current_lbs, 1)} lbs** with valid Size in Pounds.")
+    st.markdown(f"- Wholesale weighted pricing is **{format_money(current_weighted, 2)}/lb** on **{fmt_number_1(current_lbs)} lbs** with valid Size in Pounds.")
     if missing_weight_revenue:
         st.markdown(f"- **{format_money(missing_weight_revenue, 2)}** of otherwise trade roasted-coffee revenue has no usable Size in Pounds and is excluded from $/LB.")
 
@@ -490,6 +497,8 @@ st.dataframe(
         "Eligible_Revenue": st.column_config.NumberColumn("Revenue Used in $/LB", format="$%,.2f"),
         "Lbs": st.column_config.NumberColumn("Eligible Lbs", format="%,.1f"),
         "Weighted $/LB": st.column_config.NumberColumn("Weighted $/LB", format="$%.2f"),
+        "Orders": st.column_config.NumberColumn("Orders", format="%,d"),
+        "Customers": st.column_config.NumberColumn("Customers", format="%,d"),
         "Missing_Weight_Revenue": st.column_config.NumberColumn("Missing Weight Revenue", format="$%,.2f"),
     },
 )
@@ -510,7 +519,9 @@ st.dataframe(
     column_config={
         "Month Label": "Month",
         "Revenue": st.column_config.NumberColumn("Revenue", format="$%,.2f"),
-        "MoM %": st.column_config.NumberColumn("MoM %", format="%.1f%%"),
+        "Orders": st.column_config.NumberColumn("Orders", format="%,d"),
+        "Customers": st.column_config.NumberColumn("Customers", format="%,d"),
+        "MoM %": st.column_config.NumberColumn("MoM %", format="%,.1f%%"),
     },
 )
 
