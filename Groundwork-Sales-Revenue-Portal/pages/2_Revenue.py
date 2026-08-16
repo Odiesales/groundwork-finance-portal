@@ -483,7 +483,7 @@ weekly_display["Week"] = weekly_display.apply(lambda r: f"{r['Week Start']:%m/%d
 weekly_display = weekly_display[["Week", "Revenue", "Eligible_Revenue", "Lbs", "Weighted $/LB", "Orders", "Customers", "Missing_Weight_Revenue"]]
 st.dataframe(
     weekly_display,
-    width="stretch",
+    use_container_width=True,
     hide_index=True,
     column_config={
         "Revenue": st.column_config.NumberColumn("Total Revenue", format="$%,.2f"),
@@ -505,7 +505,7 @@ st.plotly_chart(monthly_chart(monthly), width="stretch")
 monthly_display = monthly[["Month Label", "Revenue", "Orders", "Customers", "MoM %"]].copy().sort_values("Month Label")
 st.dataframe(
     monthly_display,
-    width="stretch",
+    use_container_width=True,
     hide_index=True,
     column_config={
         "Month Label": "Month",
