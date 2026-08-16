@@ -45,18 +45,44 @@ if history.empty:
 else:
     c1, c2, c3, c4 = st.columns(4)
     c1.metric("Rows in History", f"{len(history):,}")
-    c2.metric("Weeks Loaded", f"{len(weeks):,}")
+    c2.metric("Periods Loaded", f"{len(weeks):,}")
     c3.metric("Revenue", format_money(history["Revenue"].sum()))
-    lbs_series = pd.to_numeric(history.get("Lbs", 0), errors="coerce").fillna(0)
-    eligible = lbs_series.gt(0) & ~history.get("Sales Channel", pd.Series("", index=history.index)).fillna("").astype(str).str.contains("retail|cafe|caf", case=False, regex=True)
-    eligible_lbs = lbs_series.where(eligible, 0).sum()
-    eligible_revenue = pd.to_numeric(history.get("Revenue", 0), errors="coerce").fillna(0).where(eligible, 0).sum()
-    c4.metric("Weighted $/LB", format_money(eligible_revenue / eligible_lbs if eligible_lbs else 0))
+
+    # Use the reconciled pounds methodology only. Never use the legacy Lbs column
+    # as package weight because it may already contain calculated pounds.
+    required_pricing = {"Size in Pounds", "Sum of Quantity", "Sales Channel"}
+    if required_pricing.issubset(history.columns):
+        size_lbs = pd.to_numeric(history["Size in Pounds"], errors="coerce").fillna(0).abs()
+        qty = pd.to_numeric(history["Sum of Quantity"], errors="coerce").fillna(0).abs()
+        if "Sum of # of Units" in history.columns:
+            units = pd.to_numeric(history["Sum of # of Units"], errors="coerce").fillna(1).abs()
+            units = units.where(units > 0, 1.0)
+        else:
+            units = pd.Series(1.0, index=history.index)
+        channel = history["Sales Channel"].fillna("").astype(str).str.lower()
+        grocery = channel.str.contains("grocery", na=False)
+        foodservice = channel.str.contains(r"foodservice|food service", regex=True, na=False)
+        wholesale = grocery | foodservice
+        calc_lbs = pd.Series(0.0, index=history.index)
+        calc_lbs.loc[grocery] = (qty * units * size_lbs).loc[grocery]
+        calc_lbs.loc[foodservice] = (qty * size_lbs).loc[foodservice]
+        eligible = wholesale & size_lbs.gt(0) & calc_lbs.gt(0)
+        eligible_lbs = calc_lbs.where(eligible, 0).sum()
+        revenue_series = pd.to_numeric(history.get("Revenue", 0), errors="coerce").fillna(0)
+        eligible_revenue = revenue_series.where(eligible, 0).sum()
+        c4.metric("Weighted $/LB", format_money(eligible_revenue / eligible_lbs if eligible_lbs else 0, 2))
+    else:
+        c4.metric("Weighted $/LB", "N/M")
 
 rev_file = st.file_uploader("Upload Revenue export", type=["xlsx", "xls", "csv"], key="rev_upload")
 if rev_file:
     try:
         rev_df = clean_uploaded_revenue_report(rev_file)
+        if "Size in Pounds" not in rev_df.columns:
+            raise ValueError(
+                "This Revenue export does not contain 'Size in Pounds'. Use the full Revenue Analysis export "
+                "with Size in Pounds so the portal can calculate wholesale $/LB accurately."
+            )
         upload_weeks = revenue_week_values(rev_df)
         existing_weeks = set(weeks)
         duplicates = sorted(set(upload_weeks) & existing_weeks)

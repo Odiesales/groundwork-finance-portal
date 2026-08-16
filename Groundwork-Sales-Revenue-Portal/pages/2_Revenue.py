@@ -106,6 +106,39 @@ def delta_label(current: float, prior: float, label: str = "prior week") -> str:
     return f"{arrow} {abs(change):.1f}% vs {label}"
 
 
+def reporting_period_bounds(value: pd.Timestamp) -> tuple[pd.Timestamp, pd.Timestamp]:
+    """Return the finance reporting period containing *value*.
+
+    Rules match the Revenue Reconciliation workbook:
+    - Every calendar month starts a new reporting cycle.
+    - If the 1st is Monday-Thursday, the opening period ends on the first Sunday.
+    - If the 1st is Friday-Sunday, that short stub is merged with the following
+      full Monday-Sunday week (for example 08/01/2026-08/09/2026).
+    - Remaining periods are Monday-Sunday and the last period is cut at month-end.
+    """
+    day = pd.Timestamp(value).normalize()
+    month_start = day.to_period("M").to_timestamp()
+    month_end = month_start + pd.offsets.MonthEnd(0)
+    weekday = month_start.weekday()  # Mon=0 ... Sun=6
+    days_to_sunday = (6 - weekday) % 7
+    if weekday >= 4:
+        opening_end = min(month_start + pd.Timedelta(days=days_to_sunday + 7), month_end)
+    else:
+        opening_end = min(month_start + pd.Timedelta(days=days_to_sunday), month_end)
+
+    if day <= opening_end:
+        return month_start, opening_end
+
+    period_start = opening_end + pd.Timedelta(days=1)
+    while period_start <= month_end:
+        period_end = min(period_start + pd.Timedelta(days=6), month_end)
+        if period_start <= day <= period_end:
+            return period_start, period_end
+        period_start = period_end + pd.Timedelta(days=1)
+
+    return month_start, month_end
+
+
 def normalize_revenue(source: pd.DataFrame) -> tuple[pd.DataFrame, bool]:
     frame = source.copy()
 
@@ -135,44 +168,48 @@ def normalize_revenue(source: pd.DataFrame) -> tuple[pd.DataFrame, bool]:
     frame["Document Calc"] = safe_text(frame, document_col or "")
     frame["Trade Bucket"] = frame["Sales Channel Calc"].map(trade_bucket)
 
-    # Strict Monday-Sunday reporting calendar.
-    frame["Week Start"] = frame["Report Date"] - pd.to_timedelta(frame["Report Date"].dt.weekday, unit="D")
-    frame["Week End"] = frame["Week Start"] + pd.Timedelta(days=6)
+    # Finance reporting periods reset at each calendar month boundary.
+    period_bounds = frame["Report Date"].map(reporting_period_bounds)
+    frame["Week Start"] = period_bounds.map(lambda pair: pair[0])
+    frame["Week End"] = period_bounds.map(lambda pair: pair[1])
     frame["Month"] = frame["Report Date"].dt.to_period("M").dt.to_timestamp()
 
     qty_col = first_column(frame, ["Sum of Quantity", "Quantity"])
     units_col = first_column(frame, ["Sum of # of Units", "# of Units", "Units"])
-    qty = safe_numeric(frame, qty_col or "").abs()
+    if qty_col is None:
+        raise ValueError("Revenue history is missing Sum of Quantity / Quantity, so pounds cannot be calculated accurately.")
+
+    qty = safe_numeric(frame, qty_col).abs()
     units = safe_numeric(frame, units_col or "", default=1.0).abs()
     units = units.where(units > 0, 1.0)
 
-    # Size in Pounds is authoritative when present. - None -, blank, zero, and
-    # nonnumeric values are not eligible for pounds or $/LB.
+    # Do not fall back to a pre-calculated Lbs field. That can double-count package
+    # weights and was the source of the implausible $0.19/LB result.
     has_size_in_pounds = "Size in Pounds" in frame.columns
-    if has_size_in_pounds:
-        size_lbs = pd.to_numeric(frame["Size in Pounds"], errors="coerce").fillna(0.0).abs()
-    else:
-        legacy_col = first_column(frame, ["Lbs", "lbs", "lbs (override)"])
-        size_lbs = safe_numeric(frame, legacy_col or "").abs()
+    if not has_size_in_pounds:
+        raise ValueError(
+            "Revenue history is missing 'Size in Pounds'. Re-upload the full Revenue Analysis export "
+            "that contains Size in Pounds before using Revenue $/LB. The portal will not use the legacy "
+            "Lbs fallback because it can materially overstate pounds."
+        )
+    size_lbs = pd.to_numeric(frame["Size in Pounds"], errors="coerce").fillna(0.0).abs()
 
-    is_grocery = frame["Trade Bucket"].isin(["Grocery Direct", "Grocery Distributor"])
-    is_foodservice = frame["Trade Bucket"].isin(["Foodservice Direct", "Foodservice Distributor"])
+    channel_text = frame["Sales Channel Calc"].str.lower()
+    is_grocery = channel_text.str.contains("grocery", na=False)
+    is_foodservice = channel_text.str.contains(r"foodservice|food service", regex=True, na=False)
+    wholesale = is_grocery | is_foodservice
+
     frame["Calculated Lbs"] = 0.0
     frame.loc[is_grocery, "Calculated Lbs"] = (qty * units * size_lbs)[is_grocery]
     frame.loc[is_foodservice, "Calculated Lbs"] = (qty * size_lbs)[is_foodservice]
 
-    roasted = frame["Item Class Calc"].str.contains(
-        r"finished goods\s*:\s*roasted coffee|roasted coffee", case=False, regex=True, na=False
-    )
-    excluded_customer = frame["Customer Calc"].str.contains(r"sample|employee", case=False, regex=True, na=False)
-    trade = frame["Trade Bucket"].notna()
     valid_weight = size_lbs.gt(0) & frame["Calculated Lbs"].gt(0)
-    eligible = roasted & trade & (~excluded_customer) & valid_weight
+    eligible = wholesale & valid_weight
 
     frame["Eligible Lbs"] = frame["Calculated Lbs"].where(eligible, 0.0)
     frame["Eligible Revenue"] = frame["Revenue Calc"].where(eligible, 0.0)
     frame["Included in $/LB"] = eligible
-    frame["Missing Weight Revenue"] = frame["Revenue Calc"].where(roasted & trade & (~excluded_customer) & (~valid_weight), 0.0)
+    frame["Missing Weight Revenue"] = frame["Revenue Calc"].where(wholesale & (~valid_weight), 0.0)
     return frame, has_size_in_pounds
 
 
@@ -363,11 +400,6 @@ except ValueError as exc:
     footer()
     st.stop()
 
-if not has_size_in_pounds:
-    st.warning(
-        "Revenue history does not yet contain 'Size in Pounds'. The page is using the legacy pounds field as a temporary fallback. "
-        "Reload the full March-August Revenue Analysis report with Size in Pounds before relying on $/LB."
-    )
 
 # -----------------------------------------------------------------------------
 # Sidebar
@@ -378,7 +410,7 @@ week_options = [pd.Timestamp(value) for value in available_weeks]
 selected_week = st.sidebar.selectbox(
     "Week Of",
     options=week_options,
-    format_func=lambda value: f"{value:%b %d} – {(value + pd.Timedelta(days=6)):%b %d, %Y}",
+    format_func=lambda value: f"{value:%b %d} – {pd.Timestamp(df.loc[df['Week Start'].eq(value), 'Week End'].iloc[0]):%b %d, %Y}",
 )
 history_weeks = st.sidebar.slider("Trend Weeks", min_value=4, max_value=26, value=16, step=1)
 
@@ -405,14 +437,16 @@ if selected_df.empty:
     footer()
     st.stop()
 
-history_start = selected_week - pd.Timedelta(weeks=history_weeks - 1)
-trend_df = filtered[(filtered["Week Start"] >= history_start) & (filtered["Week Start"] <= selected_week)].copy()
-weekly = weekly_summary(trend_df)
 all_weekly = weekly_summary(filtered)
+period_starts = list(all_weekly["Week Start"])
+selected_pos = period_starts.index(selected_week)
+trend_start_pos = max(0, selected_pos - history_weeks + 1)
+trend_period_starts = set(period_starts[trend_start_pos:selected_pos + 1])
+trend_df = filtered[filtered["Week Start"].isin(trend_period_starts)].copy()
+weekly = weekly_summary(trend_df)
 current = weekly[weekly["Week Start"] == selected_week].iloc[0]
-prior_rows = all_weekly[all_weekly["Week Start"] == selected_week - pd.Timedelta(days=7)]
-prior = prior_rows.iloc[0] if not prior_rows.empty else None
-prior_four = all_weekly[(all_weekly["Week Start"] < selected_week) & (all_weekly["Week Start"] >= selected_week - pd.Timedelta(days=28))]
+prior = all_weekly.iloc[selected_pos - 1] if selected_pos > 0 else None
+prior_four = all_weekly.iloc[max(0, selected_pos - 4):selected_pos]
 
 monthly = monthly_summary(filtered)
 selected_month = selected_week.to_period("M").to_timestamp()
@@ -444,7 +478,7 @@ if not dso_full.empty:
 # -----------------------------------------------------------------------------
 section(
     "Executive Summary",
-    f"Selected week: {selected_week:%b %d}–{(selected_week + pd.Timedelta(days=6)):%b %d, %Y}. Weekly reporting is always Monday–Sunday; monthly reporting follows calendar months.",
+    f"Selected reporting period: {selected_week:%b %d}–{pd.Timestamp(current['Week End']):%b %d, %Y}. Periods follow the finance month-boundary calendar; monthly reporting follows calendar months.",
 )
 current_revenue = float(current["Revenue"])
 current_lbs = float(current["Lbs"])
@@ -467,48 +501,39 @@ with st.container(border=True):
     change = percent_change(current_revenue, prior_revenue)
     if change is not None:
         direction = "up" if change >= 0 else "down"
-        st.markdown(f"- Weekly revenue is **{direction} {abs(change):.1f}%** versus the prior Monday–Sunday week.")
+        st.markdown(f"- Revenue is **{direction} {abs(change):.1f}%** versus the prior finance reporting period.")
     if four_avg:
         four_change = percent_change(current_revenue, four_avg)
         if four_change is not None:
             position = "above" if four_change >= 0 else "below"
             st.markdown(f"- The selected week is **{abs(four_change):.1f}% {position}** the prior 4-week average of {format_money(four_avg, 0)}.")
-    st.markdown(f"- Wholesale weighted pricing is **{format_money(current_weighted, 2)}/lb** on **{fmt_number_1(current_lbs)} lbs** with valid Size in Pounds.")
+    st.markdown(f"- Wholesale weighted pricing is **{format_money(current_weighted, 2)}/lb** on **{fmt_number_1(current_lbs)} lbs** from Grocery + Foodservice rows with valid Size in Pounds.")
     if missing_weight_revenue:
-        st.markdown(f"- **{format_money(missing_weight_revenue, 2)}** of otherwise trade roasted-coffee revenue has no usable Size in Pounds and is excluded from $/LB.")
+        st.markdown(f"- **{format_money(missing_weight_revenue, 2)}** of Grocery + Foodservice revenue has no usable Size in Pounds / calculated pounds and is excluded from $/LB.")
 
 # -----------------------------------------------------------------------------
 # Weekly Revenue + $/LB
 # -----------------------------------------------------------------------------
 section(
     "Weekly Revenue + $/LB",
-    "Monday–Sunday operating view. Total revenue includes all selected revenue; pounds and weighted $/LB use only trade roasted-coffee rows with a positive Size in Pounds.",
+    "Finance reporting-period view. Total revenue includes all selected revenue; pounds and weighted $/LB use Grocery + Foodservice rows with a positive Size in Pounds and positive calculated pounds.",
 )
 st.plotly_chart(weekly_chart(weekly), width="stretch")
 weekly_display = weekly[["Week Start", "Week End", "Revenue", "Eligible_Revenue", "Lbs", "Weighted $/LB", "Orders", "Customers", "Missing_Weight_Revenue"]].copy().sort_values("Week Start", ascending=False)
 weekly_display["Week"] = weekly_display.apply(lambda r: f"{r['Week Start']:%m/%d/%y} - {r['Week End']:%m/%d/%y}", axis=1)
 weekly_display = weekly_display[["Week", "Revenue", "Eligible_Revenue", "Lbs", "Weighted $/LB", "Orders", "Customers", "Missing_Weight_Revenue"]]
-# Pre-format display values so Streamlit consistently shows thousands separators.
-# NumberColumn printf formatting does not support Python's comma grouping syntax.
-weekly_display["Revenue"] = weekly_display["Revenue"].map(lambda v: f"${float(v):,.2f}")
-weekly_display["Eligible_Revenue"] = weekly_display["Eligible_Revenue"].map(lambda v: f"${float(v):,.2f}")
-weekly_display["Lbs"] = weekly_display["Lbs"].map(lambda v: f"{float(v):,.1f}")
-weekly_display["Weighted $/LB"] = weekly_display["Weighted $/LB"].map(lambda v: f"${float(v):,.2f}")
-weekly_display["Orders"] = weekly_display["Orders"].map(lambda v: f"{int(round(float(v))):,}")
-weekly_display["Customers"] = weekly_display["Customers"].map(lambda v: f"{int(round(float(v))):,}")
-weekly_display["Missing_Weight_Revenue"] = weekly_display["Missing_Weight_Revenue"].map(lambda v: f"${float(v):,.2f}")
 st.dataframe(
     weekly_display,
     use_container_width=True,
     hide_index=True,
     column_config={
-        "Revenue": "Total Revenue",
-        "Eligible_Revenue": "Revenue Used in $/LB",
-        "Lbs": "Eligible Lbs",
-        "Weighted $/LB": "Weighted $/LB",
-        "Orders": "Orders",
-        "Customers": "Customers",
-        "Missing_Weight_Revenue": "Missing Weight Revenue",
+        "Revenue": st.column_config.NumberColumn("Total Revenue", format="$%,.2f"),
+        "Eligible_Revenue": st.column_config.NumberColumn("Revenue Used in $/LB", format="$%,.2f"),
+        "Lbs": st.column_config.NumberColumn("Eligible Lbs", format="%,.1f"),
+        "Weighted $/LB": st.column_config.NumberColumn("Weighted $/LB", format="$%.2f"),
+        "Orders": st.column_config.NumberColumn("Orders", format="%,d"),
+        "Customers": st.column_config.NumberColumn("Customers", format="%,d"),
+        "Missing_Weight_Revenue": st.column_config.NumberColumn("Missing Weight Revenue", format="$%,.2f"),
     },
 )
 
@@ -521,20 +546,16 @@ section(
 )
 st.plotly_chart(monthly_chart(monthly), width="stretch")
 monthly_display = monthly[["Month Label", "Revenue", "Orders", "Customers", "MoM %"]].copy().sort_values("Month Label")
-monthly_display["Revenue"] = monthly_display["Revenue"].map(lambda v: f"${float(v):,.2f}")
-monthly_display["Orders"] = monthly_display["Orders"].map(lambda v: f"{int(round(float(v))):,}")
-monthly_display["Customers"] = monthly_display["Customers"].map(lambda v: f"{int(round(float(v))):,}")
-monthly_display["MoM %"] = monthly_display["MoM %"].map(lambda v: "N/M" if pd.isna(v) else f"{float(v):,.1f}%")
 st.dataframe(
     monthly_display,
     use_container_width=True,
     hide_index=True,
     column_config={
         "Month Label": "Month",
-        "Revenue": "Revenue",
-        "Orders": "Orders",
-        "Customers": "Customers",
-        "MoM %": "MoM %",
+        "Revenue": st.column_config.NumberColumn("Revenue", format="$%,.2f"),
+        "Orders": st.column_config.NumberColumn("Orders", format="%,d"),
+        "Customers": st.column_config.NumberColumn("Customers", format="%,d"),
+        "MoM %": st.column_config.NumberColumn("MoM %", format="%,.1f%%"),
     },
 )
 
