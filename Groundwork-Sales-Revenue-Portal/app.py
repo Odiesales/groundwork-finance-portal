@@ -26,4 +26,4 @@ pages = [
 ]
 
 nav = st.navigation(pages, position="sidebar")
-nav.run()
+_ = nav.run()
