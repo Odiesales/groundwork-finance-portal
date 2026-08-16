@@ -488,18 +488,27 @@ st.plotly_chart(weekly_chart(weekly), width="stretch")
 weekly_display = weekly[["Week Start", "Week End", "Revenue", "Eligible_Revenue", "Lbs", "Weighted $/LB", "Orders", "Customers", "Missing_Weight_Revenue"]].copy().sort_values("Week Start", ascending=False)
 weekly_display["Week"] = weekly_display.apply(lambda r: f"{r['Week Start']:%m/%d/%y} - {r['Week End']:%m/%d/%y}", axis=1)
 weekly_display = weekly_display[["Week", "Revenue", "Eligible_Revenue", "Lbs", "Weighted $/LB", "Orders", "Customers", "Missing_Weight_Revenue"]]
+# Pre-format display values so Streamlit consistently shows thousands separators.
+# NumberColumn printf formatting does not support Python's comma grouping syntax.
+weekly_display["Revenue"] = weekly_display["Revenue"].map(lambda v: f"${float(v):,.2f}")
+weekly_display["Eligible_Revenue"] = weekly_display["Eligible_Revenue"].map(lambda v: f"${float(v):,.2f}")
+weekly_display["Lbs"] = weekly_display["Lbs"].map(lambda v: f"{float(v):,.1f}")
+weekly_display["Weighted $/LB"] = weekly_display["Weighted $/LB"].map(lambda v: f"${float(v):,.2f}")
+weekly_display["Orders"] = weekly_display["Orders"].map(lambda v: f"{int(round(float(v))):,}")
+weekly_display["Customers"] = weekly_display["Customers"].map(lambda v: f"{int(round(float(v))):,}")
+weekly_display["Missing_Weight_Revenue"] = weekly_display["Missing_Weight_Revenue"].map(lambda v: f"${float(v):,.2f}")
 st.dataframe(
     weekly_display,
     use_container_width=True,
     hide_index=True,
     column_config={
-        "Revenue": st.column_config.NumberColumn("Total Revenue", format="$%,.2f"),
-        "Eligible_Revenue": st.column_config.NumberColumn("Revenue Used in $/LB", format="$%,.2f"),
-        "Lbs": st.column_config.NumberColumn("Eligible Lbs", format="%,.1f"),
-        "Weighted $/LB": st.column_config.NumberColumn("Weighted $/LB", format="$%.2f"),
-        "Orders": st.column_config.NumberColumn("Orders", format="%,d"),
-        "Customers": st.column_config.NumberColumn("Customers", format="%,d"),
-        "Missing_Weight_Revenue": st.column_config.NumberColumn("Missing Weight Revenue", format="$%,.2f"),
+        "Revenue": "Total Revenue",
+        "Eligible_Revenue": "Revenue Used in $/LB",
+        "Lbs": "Eligible Lbs",
+        "Weighted $/LB": "Weighted $/LB",
+        "Orders": "Orders",
+        "Customers": "Customers",
+        "Missing_Weight_Revenue": "Missing Weight Revenue",
     },
 )
 
@@ -512,16 +521,20 @@ section(
 )
 st.plotly_chart(monthly_chart(monthly), width="stretch")
 monthly_display = monthly[["Month Label", "Revenue", "Orders", "Customers", "MoM %"]].copy().sort_values("Month Label")
+monthly_display["Revenue"] = monthly_display["Revenue"].map(lambda v: f"${float(v):,.2f}")
+monthly_display["Orders"] = monthly_display["Orders"].map(lambda v: f"{int(round(float(v))):,}")
+monthly_display["Customers"] = monthly_display["Customers"].map(lambda v: f"{int(round(float(v))):,}")
+monthly_display["MoM %"] = monthly_display["MoM %"].map(lambda v: "N/M" if pd.isna(v) else f"{float(v):,.1f}%")
 st.dataframe(
     monthly_display,
     use_container_width=True,
     hide_index=True,
     column_config={
         "Month Label": "Month",
-        "Revenue": st.column_config.NumberColumn("Revenue", format="$%,.2f"),
-        "Orders": st.column_config.NumberColumn("Orders", format="%,d"),
-        "Customers": st.column_config.NumberColumn("Customers", format="%,d"),
-        "MoM %": st.column_config.NumberColumn("MoM %", format="%,.1f%%"),
+        "Revenue": "Revenue",
+        "Orders": "Orders",
+        "Customers": "Customers",
+        "MoM %": "MoM %",
     },
 )
 
