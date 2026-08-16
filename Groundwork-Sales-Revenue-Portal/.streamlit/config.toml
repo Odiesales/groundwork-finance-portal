@@ -9,3 +9,6 @@ font = "sans serif"
 [client]
 toolbarMode = "minimal"
 showSidebarNavigation = true
+
+[runner]
+magicEnabled = false
