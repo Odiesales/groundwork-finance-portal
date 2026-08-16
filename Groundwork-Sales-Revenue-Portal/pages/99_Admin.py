@@ -14,6 +14,9 @@ from utils.data import (
 from utils.paths import REVENUE_HISTORY_PATH
 from utils.ui import footer, format_money, page_header, section
 from utils.google_drive import connection_test, sync_from_drive, upload_file as upload_drive_file
+from pathlib import Path
+import calendar
+
 
 page_header(
     "Sales Revenue Administration",
@@ -83,7 +86,7 @@ if rev_file:
             st.rerun()
 
         st.download_button("Download Cleaned Revenue Excel", convert_df_to_excel(rev_df), "cleaned_revenue_report.xlsx")
-        st.dataframe(rev_df.head(300), width="stretch", hide_index=True)
+        st.dataframe(rev_df.head(300), use_container_width=True, hide_index=True)
     except Exception as exc:
         st.error(f"Could not process Revenue file: {exc}")
 
@@ -103,12 +106,89 @@ if weeks:
         except Exception as exc:
             st.error(f"Revenue history updated locally, but Google Drive upload failed: {exc}")
         st.rerun()
-    st.dataframe(revenue_week_table(history), width="stretch", hide_index=True, column_config={
+    st.dataframe(revenue_week_table(history), use_container_width=True, hide_index=True, column_config={
         "Revenue": st.column_config.NumberColumn("Revenue", format="$%,.2f"),
         "Lbs": st.column_config.NumberColumn("Lbs", format="%.1f"),
         "Weighted $/LB": st.column_config.NumberColumn("Weighted $/LB", format="$%,.2f"),
     })
 else:
     st.info("No weeks are available to manage.")
+
+
+st.divider()
+section(
+    "Month-End AR Aging — DSO",
+    "Upload one exact month-end AR Aging snapshot per month. These snapshots are used only for the Monthly DSO schedule."
+)
+
+AR_DSO_DIR = Path("data") / "ar_month_end"
+AR_DSO_DIR.mkdir(parents=True, exist_ok=True)
+
+ar_file = st.file_uploader(
+    "Upload Month-End AR Aging",
+    type=["xlsx", "xls", "csv"],
+    key="ar_eom_upload",
+    help="Use the AR Aging as of the exact calendar month-end (for example, 07/31/2026).",
+)
+ar_as_of = st.date_input("Aging As-of Date", key="ar_eom_as_of")
+
+last_day = calendar.monthrange(ar_as_of.year, ar_as_of.month)[1]
+is_month_end = ar_as_of.day == last_day
+
+if not is_month_end:
+    st.warning(
+        f"DSO requires an exact month-end snapshot. "
+        f"{ar_as_of:%B %Y} month-end is {ar_as_of.replace(day=last_day):%m/%d/%Y}."
+    )
+
+if ar_file is not None:
+    st.info(
+        "This snapshot will be retained for Monthly DSO. "
+        "Only Foodservice Direct, Foodservice Distributor, Grocery Direct, and Grocery Distributor "
+        "will be used in the DSO calculation."
+    )
+
+    save_ar = st.button(
+        "Save Month-End AR Snapshot",
+        type="primary",
+        disabled=not is_month_end,
+    )
+
+    if save_ar:
+        suffix = Path(ar_file.name).suffix.lower()
+        snapshot_name = f"ar_aging_{ar_as_of:%Y-%m-%d}{suffix}"
+        snapshot_path = AR_DSO_DIR / snapshot_name
+        snapshot_path.write_bytes(ar_file.getvalue())
+
+        try:
+            upload_drive_file(
+                snapshot_path,
+                "revenue",
+                f"ar_month_end/{snapshot_name}",
+            )
+            st.success(
+                f"Month-end AR Aging saved for {ar_as_of:%m/%d/%Y} and uploaded to Google Drive."
+            )
+        except Exception as exc:
+            st.error(
+                f"AR snapshot saved locally, but Google Drive upload failed: {exc}"
+            )
+
+saved_snapshots = sorted(AR_DSO_DIR.glob("ar_aging_*"), reverse=True)
+if saved_snapshots:
+    st.caption("Saved Month-End AR Snapshots")
+    snapshot_rows = []
+    for p in saved_snapshots:
+        snapshot_rows.append({
+            "Snapshot": p.name,
+            "Stored File": str(p),
+        })
+    st.dataframe(
+        pd.DataFrame(snapshot_rows),
+        use_container_width=True,
+        hide_index=True,
+    )
+else:
+    st.info("No month-end AR Aging snapshots are currently saved.")
 
 footer()
