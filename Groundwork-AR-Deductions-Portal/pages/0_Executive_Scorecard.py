@@ -170,27 +170,90 @@ with right:
 section("Executive Watchlist", "Accounts with the largest aged balances and collection exposure.")
 watch = current.copy()
 watch["Open Balance"] = pd.to_numeric(watch["Open Balance"], errors="coerce").fillna(0)
-watch["Past Due"] = np.where(watch["Bucket"].eq("Current"), 0, watch["Open Balance"])
-watch["90+ Balance"] = np.where(watch["Bucket"].isin(["91+", "90+"]), watch["Open Balance"], 0)
-watchlist = watch.groupby("Reporting Customer", dropna=False).agg(
-    **{"Open Balance":("Open Balance", "sum"), "Past Due":("Past Due", "sum"), "90+ Balance":("90+ Balance", "sum")},
-    Channel=("Channel Clean", "first"), Terms=("Terms: Name", "first"),
-).reset_index()
-watchlist["Past Due %"] = np.where(watchlist["Open Balance"].ne(0), watchlist["Past Due"] / watchlist["Open Balance"], 0)
-watchlist["Priority"] = np.select(
-    [watchlist["90+ Balance"] >= 50000, watchlist["Past Due"] >= 100000, watchlist["Past Due %"] >= .75],
-    ["Critical", "High", "Elevated"], default="Monitor",
+watch["Transaction Type Normalized"] = _norm_text(watch.get("Transaction Type", pd.Series("", index=watch.index)))
+watch["Deduction Type Normalized"] = _norm_text(
+    watch.get("Deduction Type", watch.get("Transaction Reason", pd.Series("", index=watch.index)))
 )
-watchlist = watchlist.sort_values(["90+ Balance", "Past Due"], ascending=False).head(12)
+watch["Bucket"] = (
+    watch.get("Bucket", pd.Series("Unknown", index=watch.index))
+    .fillna("Unknown").astype(str).str.strip()
+    .str.replace(r"^91\+.*$", "91+", regex=True)
+    .str.replace(r"^90\+.*$", "91+", regex=True)
+    .str.replace(r"^61\s*[-–]\s*90.*$", "61-90", regex=True)
+    .str.replace(r"^31\s*[-–]\s*60.*$", "31-60", regex=True)
+    .str.replace(r"^15\s*[-–]\s*30.*$", "15-30", regex=True)
+    .str.replace(r"^1\s*[-–]\s*14.*$", "1-14", regex=True)
+    .str.replace(r"^Current.*$", "Current", regex=True, case=False)
+)
+
+is_cb = watch["Transaction Type Normalized"].str.contains("chargeback", na=False)
+is_credit = watch["Transaction Type Normalized"].str.contains("credit", na=False)
+is_payment = watch["Transaction Type Normalized"].str.contains("payment", na=False)
+is_holdback = watch["Deduction Type Normalized"].eq("holdback")
+is_invoice = ~(is_cb | is_credit | is_payment) & ~is_holdback
+
+invoice_watch = watch[is_invoice].copy()
+invoice_watch["Current"] = np.where(invoice_watch["Bucket"].eq("Current"), invoice_watch["Open Balance"], 0)
+invoice_watch["1-30"] = np.where(invoice_watch["Bucket"].isin(["1-14", "15-30"]), invoice_watch["Open Balance"], 0)
+invoice_watch["31-60"] = np.where(invoice_watch["Bucket"].eq("31-60"), invoice_watch["Open Balance"], 0)
+invoice_watch["61-90"] = np.where(invoice_watch["Bucket"].eq("61-90"), invoice_watch["Open Balance"], 0)
+invoice_watch["91+"] = np.where(invoice_watch["Bucket"].eq("91+"), invoice_watch["Open Balance"], 0)
+invoice_watch["Past Due"] = invoice_watch[["1-30", "31-60", "61-90", "91+"]].sum(axis=1)
+
+invoice_aging = invoice_watch.groupby("Reporting Customer", dropna=False).agg(
+    **{
+        "Current": ("Current", "sum"),
+        "1-30": ("1-30", "sum"),
+        "31-60": ("31-60", "sum"),
+        "61-90": ("61-90", "sum"),
+        "91+": ("91+", "sum"),
+        "Past Due": ("Past Due", "sum"),
+    }
+).reset_index()
+
+customer_total = watch.groupby("Reporting Customer", dropna=False)["Open Balance"].sum().rename("Total AR").reset_index()
+customer_info = watch.groupby("Reporting Customer", dropna=False).agg(
+    Channel=("Channel Clean", "first"),
+    Terms=("Terms: Name", "first"),
+).reset_index()
+
+watchlist = customer_total.merge(invoice_aging, on="Reporting Customer", how="left").merge(
+    customer_info, on="Reporting Customer", how="left"
+)
+for col in ["Current", "1-30", "31-60", "61-90", "91+", "Past Due"]:
+    watchlist[col] = pd.to_numeric(watchlist[col], errors="coerce").fillna(0)
+
+watchlist["Past Due %"] = np.where(
+    watchlist["Total AR"].ne(0),
+    watchlist["Past Due"] / watchlist["Total AR"],
+    0,
+)
+watchlist["Priority"] = np.select(
+    [
+        watchlist["91+"] >= 50000,
+        watchlist["Past Due"] >= 100000,
+        watchlist["Past Due %"] >= .75,
+    ],
+    ["Critical", "High", "Elevated"],
+    default="Monitor",
+)
+watchlist = watchlist.sort_values(["91+", "Past Due", "Total AR"], ascending=False).head(12)
+watchlist = watchlist[[
+    "Reporting Customer", "Current", "1-30", "31-60", "61-90", "91+",
+    "Total AR", "Past Due", "Channel", "Terms", "Past Due %", "Priority"
+]]
+
 st.dataframe(
-    watchlist.style.format(
-        {
-            "Open Balance": "${:,.2f}",
-            "Past Due": "${:,.2f}",
-            "90+ Balance": "${:,.2f}",
-            "Past Due %": "{:.1%}",
-        }
-    ),
+    watchlist.style.format({
+        "Current": "${:,.2f}",
+        "1-30": "${:,.2f}",
+        "31-60": "${:,.2f}",
+        "61-90": "${:,.2f}",
+        "91+": "${:,.2f}",
+        "Total AR": "${:,.2f}",
+        "Past Due": "${:,.2f}",
+        "Past Due %": "{:.1%}",
+    }),
     use_container_width=True,
     hide_index=True,
 )

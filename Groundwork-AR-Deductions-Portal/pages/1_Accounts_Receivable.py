@@ -317,16 +317,34 @@ for customer, group in df.groupby("Reporting Customer", dropna=False):
         priority, reason = "Review CB", "Open chargeback balance"
     else:
         priority, reason = "Monitor", "No immediate collection risk"
+    credit = group[group["Transaction Type Normalized"].str.contains("credit", na=False)].copy()
+    total_invoices = inv["Open Balance"].sum()
+    total_credits = credit["Open Balance"].sum()
+    total_chargebacks = cb["Open Balance"].sum()
+
     records.append({
-        "Customer": customer, "Total AR": group["Open Balance"].sum(), "Past Due": past_due_balance,
-        "60+": bal_60, "90+": bal_90, "Chargebacks": cb["Open Balance"].sum(),
-        "Oldest Invoice Days": oldest_age, "Next Due Date": date_display(next_due),
+        "Customer": customer,
+        "Total Invoices": total_invoices,
+        "Total Credits": total_credits,
+        "Total Chargebacks": total_chargebacks,
+        "Total AR": group["Open Balance"].sum(),
+        "Past Due": past_due_balance,
+        "60+": bal_60,
+        "90+": bal_90,
+        "Chargebacks": total_chargebacks,
+        "Oldest Invoice Days": oldest_age,
+        "Next Due Date": date_display(next_due),
         "Channel": first_nonblank(group[channel_col]),
-        "Terms": first_nonblank(group["Terms: Name"]), "Sales Rep": first_nonblank(group["Sales Rep: Name"]),
-        "Suggested Hold": "Yes" if suggested_hold else "No", "Status": "—", "Priority": priority, "Reason": reason,
+        "Terms": first_nonblank(group["Terms: Name"]),
+        "Sales Rep": first_nonblank(group["Sales Rep: Name"]),
+        "Suggested Hold": "Yes" if suggested_hold else "No",
+        "Status": "—",
+        "Priority": priority,
+        "Reason": reason,
     })
 CUSTOMER_SUMMARY_COLUMNS = [
-    "Customer", "Total AR", "Past Due", "60+", "90+", "Chargebacks",
+    "Customer", "Total Invoices", "Total Credits", "Total Chargebacks",
+    "Total AR", "Past Due", "60+", "90+", "Chargebacks",
     "Oldest Invoice Days", "Next Due Date", "Channel", "Terms", "Sales Rep",
     "Suggested Hold", "Status", "Priority", "Reason",
 ]
@@ -344,12 +362,25 @@ if limit is not None:
     export_source = export_source.head(limit)
 with c_export:
     st.download_button("⇩ Export CSV", export_source.to_csv(index=False).encode("utf-8"), f"AR_Customer_Exposure_{selected_as_of.replace('/', '-')}.csv", "text/csv", use_container_width=True)
-exposure_table = export_source[["Customer", "Channel", "Sales Rep", "Terms", "Past Due", "Total AR"]].copy()
+exposure_table = export_source[[
+    "Customer", "Channel", "Sales Rep", "Terms",
+    "Total Invoices", "Total Credits", "Total Chargebacks",
+    "Past Due", "Total AR"
+]].copy()
 exposure_table.insert(0, "Rank", range(1, len(exposure_table) + 1))
 exposure_table["% of Total AR"] = exposure_table["Total AR"].div(total_ar).fillna(0)
 st.dataframe(
-    exposure_table.style.format({"Past Due": "${:,.2f}", "Total AR": "${:,.2f}", "% of Total AR": "{:.2%}"}),
-    use_container_width=True, hide_index=True, height=min(760, max(160, 38 * (len(exposure_table) + 1))),
+    exposure_table.style.format({
+        "Total Invoices": "${:,.2f}",
+        "Total Credits": "${:,.2f}",
+        "Total Chargebacks": "${:,.2f}",
+        "Past Due": "${:,.2f}",
+        "Total AR": "${:,.2f}",
+        "% of Total AR": "{:.2%}",
+    }),
+    use_container_width=True,
+    hide_index=True,
+    height=min(760, max(160, 38 * (len(exposure_table) + 1))),
     column_config={"Rank": st.column_config.NumberColumn("Rank", format="%d")},
 )
 section_end()
