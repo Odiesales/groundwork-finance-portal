@@ -317,12 +317,19 @@ for customer, group in df.groupby("Reporting Customer", dropna=False):
         priority, reason = "Review CB", "Open chargeback balance"
     else:
         priority, reason = "Monitor", "No immediate collection risk"
-    credit = group[group["Transaction Type Normalized"].str.contains("credit", na=False)].copy()
+    # Top 25 reconciliation buckets:
+    # - Total Invoices includes all invoice-type open balances, including holdbacks.
+    # - Total Credits includes both credit memos and open payment/unapplied-payment balances.
+    # - Total Chargebacks includes chargeback balances.
+    # These three categories are mutually exclusive and exhaustive, so they tie to Total AR.
+    credit_or_payment = group[
+        group["Transaction Type Normalized"].str.contains("credit|payment", regex=True, na=False)
+    ].copy()
     invoice_all = group[
         ~group["Transaction Type Normalized"].str.contains("chargeback|credit|payment", regex=True, na=False)
     ].copy()
     total_invoices = invoice_all["Open Balance"].sum()
-    total_credits = credit["Open Balance"].sum()
+    total_credits = credit_or_payment["Open Balance"].sum()
     total_chargebacks = cb["Open Balance"].sum()
 
     records.append({
