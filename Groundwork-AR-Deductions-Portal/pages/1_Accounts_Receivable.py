@@ -318,7 +318,10 @@ for customer, group in df.groupby("Reporting Customer", dropna=False):
     else:
         priority, reason = "Monitor", "No immediate collection risk"
     credit = group[group["Transaction Type Normalized"].str.contains("credit", na=False)].copy()
-    total_invoices = inv["Open Balance"].sum()
+    invoice_all = group[
+        ~group["Transaction Type Normalized"].str.contains("chargeback|credit|payment", regex=True, na=False)
+    ].copy()
+    total_invoices = invoice_all["Open Balance"].sum()
     total_credits = credit["Open Balance"].sum()
     total_chargebacks = cb["Open Balance"].sum()
 
