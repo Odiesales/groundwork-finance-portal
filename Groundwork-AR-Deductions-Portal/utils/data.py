@@ -22,7 +22,10 @@ def ar_transaction_masks(df):
     ).fillna("").astype(str).str.strip().str.casefold()
     memo = df.get("Memo", pd.Series("", index=index)).fillna("").astype(str).str.strip().str.casefold()
 
-    cb_marker = memo.str.contains(r"(?:^|\b)ar\s*cb\b", regex=True, na=False)
+    cb_marker = (
+        memo.str.contains(r"(?:^|\b)ar\s*cb\b", regex=True, na=False)
+        | transaction.str.contains(r"(?:^|\b)ar\s*cb\b", regex=True, na=False)
+    )
     chargeback = transaction.str.contains(r"charge\s*back|chargeback", regex=True, na=False) | cb_marker
     credit = transaction.str.contains("credit", regex=False, na=False) & ~chargeback
     payment = transaction.str.contains("payment", regex=False, na=False) & ~chargeback
@@ -296,7 +299,11 @@ def prep_ar(df):
     df['Open Balance'] = pd.to_numeric(df['Open Balance'], errors='coerce').fillna(0)
     df['Snapshot Date'] = pd.to_datetime(df['Snapshot Date'], errors='coerce')
     memo = df['Memo'].fillna('').astype(str).str.strip().str.casefold()
-    cb_marker = memo.str.contains(r'(?:^|\b)ar\s*cb\b', regex=True, na=False)
+    transaction = df['Transaction Type'].fillna('').astype(str).str.strip().str.casefold()
+    cb_marker = (
+        memo.str.contains(r'(?:^|\b)ar\s*cb\b', regex=True, na=False)
+        | transaction.str.contains(r'(?:^|\b)ar\s*cb\b', regex=True, na=False)
+    )
     holdback = df['Deduction Type'].fillna('').astype(str).str.strip().str.casefold().eq('holdback')
     df.loc[cb_marker & ~holdback, 'Transaction Type'] = 'Chargeback'
     blank_reason = df['Deduction Type'].fillna('').astype(str).str.strip().eq('')

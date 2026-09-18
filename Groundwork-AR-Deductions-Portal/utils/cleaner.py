@@ -116,7 +116,8 @@ def classify_transaction(row):
         return pd.Series(["Invoice", "Holdback"])
     # The AR team marks known chargebacks with "AR CB" in the memo. NetSuite can
     # still export those rows as invoices, so the marker must override the source type.
-    if re.search(r"(?:^|\b)ar\s*cb\b", normalize_text(memo)):
+    cb_marker_text = f"{normalize_text(original_type)} {normalize_text(memo)}"
+    if re.search(r"(?:^|\b)ar\s*cb\b", cb_marker_text):
         return pd.Series(["Chargeback", "Other"])
     if memo_reason in CHARGEBACK_REASONS:
         return pd.Series(["Chargeback", memo_reason])
