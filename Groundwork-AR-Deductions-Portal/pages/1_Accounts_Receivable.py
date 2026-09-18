@@ -5,7 +5,7 @@ import pandas as pd
 import plotly.express as px
 import streamlit as st
 
-from utils.data import prep_ar
+from utils.data import ar_transaction_masks, prep_ar
 from utils.paths import AR_SNAPSHOT_DIR, CURRENT_AR_PATH
 from utils.ui import footer, page_header
 
@@ -230,13 +230,14 @@ if "Due Date" in df.columns:
 else:
     df["Due Date Parsed"] = pd.NaT
 
-is_chargeback = df["Transaction Type Normalized"].str.contains("chargeback", na=False)
-is_credit = df["Transaction Type Normalized"].str.contains("credit", na=False)
-is_payment = df["Transaction Type Normalized"].str.contains("payment", na=False)
-is_holdback = df["Deduction Type Normalized"].eq("holdback")
+transaction_masks = ar_transaction_masks(df)
+is_chargeback = transaction_masks["chargeback"]
+is_credit = transaction_masks["credit"]
+is_payment = transaction_masks["payment"]
+is_holdback = transaction_masks["holdback"]
 # Treat remaining open AR rows as invoices; this is more reliable across NetSuite export labels.
 is_invoice = ~(is_chargeback | is_credit | is_payment)
-is_recovery = df["Deduction Type Normalized"].isin({"duplicate pmt", "overpayment", "pmt transfer", "on account payment (oap)"})
+is_recovery = transaction_masks["recovery"]
 
 invoice_rows = df[is_invoice & ~is_holdback].copy()
 chargeback_rows = df[is_chargeback].copy()
@@ -256,13 +257,10 @@ def snapshot_metric_values(frame):
     work = frame.copy()
     work["Open Balance"] = pd.to_numeric(work.get("Open Balance", 0), errors="coerce").fillna(0)
     work["Bucket"] = work.get("Bucket", "Unknown").fillna("Unknown").astype(str).str.strip()
-    transaction = work.get("Transaction Type", "").fillna("").astype(str).str.casefold()
-    deduction = work.get("Deduction Type", "").fillna("").astype(str).str.casefold()
-    cb_mask = transaction.str.contains("chargeback", na=False)
-    credit_mask = transaction.str.contains("credit", na=False)
-    payment_mask = transaction.str.contains("payment", na=False)
-    invoice_mask = ~(cb_mask | credit_mask | payment_mask) & ~deduction.eq("holdback")
-    recovery_mask = cb_mask & deduction.isin({"duplicate pmt", "overpayment", "pmt transfer", "on account payment (oap)"})
+    masks = ar_transaction_masks(work)
+    cb_mask = masks["chargeback"]
+    invoice_mask = masks["invoice"]
+    recovery_mask = masks["recovery"]
     return {
         "Total AR": float(work["Open Balance"].sum()),
         "Past Due": float(work.loc[invoice_mask & work["Bucket"].isin(PAST_DUE_BUCKETS), "Open Balance"].sum()),
@@ -302,8 +300,9 @@ section_end()
 
 records = []
 for customer, group in df.groupby("Reporting Customer", dropna=False):
-    inv = group[(~group["Transaction Type Normalized"].str.contains("chargeback|credit|payment", regex=True, na=False)) & ~group["Deduction Type Normalized"].eq("holdback")].copy()
-    cb = group[group["Transaction Type Normalized"].str.contains("chargeback", na=False)].copy()
+    group_masks = ar_transaction_masks(group)
+    inv = group[group_masks["invoice"]].copy()
+    cb = group[group_masks["chargeback"]].copy()
     positive_inv = inv[inv["Open Balance"] > 0]
     past_due_balance = inv.loc[inv["Bucket"].isin(PAST_DUE_BUCKETS), "Open Balance"].sum()
     bal_60 = inv.loc[inv["Bucket"].isin(OVER_60_BUCKETS), "Open Balance"].sum()
@@ -322,12 +321,8 @@ for customer, group in df.groupby("Reporting Customer", dropna=False):
     # - Total Credits includes both credit memos and open payment/unapplied-payment balances.
     # - Total Chargebacks includes chargeback balances.
     # These three categories are mutually exclusive and exhaustive, so they tie to Total AR.
-    credit_or_payment = group[
-        group["Transaction Type Normalized"].str.contains("credit|payment", regex=True, na=False)
-    ].copy()
-    invoice_all = group[
-        ~group["Transaction Type Normalized"].str.contains("chargeback|credit|payment", regex=True, na=False)
-    ].copy()
+    credit_or_payment = group[group_masks["credit"] | group_masks["payment"]].copy()
+    invoice_all = group[~(group_masks["chargeback"] | group_masks["credit"] | group_masks["payment"])].copy()
     total_invoices = invoice_all["Open Balance"].sum()
     total_credits = credit_or_payment["Open Balance"].sum()
     total_chargebacks = cb["Open Balance"].sum()

@@ -108,11 +108,16 @@ def get_memo_reason(memo):
 
 
 def classify_transaction(row):
-    memo_reason = get_memo_reason(row.get("Memo", ""))
+    memo = row.get("Memo", "")
+    memo_reason = get_memo_reason(memo)
     original_type = row.get("Transaction Type", row.get("Type", ""))
     original_type = "" if pd.isna(original_type) else str(original_type).strip()
     if memo_reason == "Holdback":
         return pd.Series(["Invoice", "Holdback"])
+    # The AR team marks known chargebacks with "AR CB" in the memo. NetSuite can
+    # still export those rows as invoices, so the marker must override the source type.
+    if re.search(r"(?:^|\b)ar\s*cb\b", normalize_text(memo)):
+        return pd.Series(["Chargeback", "Other"])
     if memo_reason in CHARGEBACK_REASONS:
         return pd.Series(["Chargeback", memo_reason])
     low = original_type.lower()

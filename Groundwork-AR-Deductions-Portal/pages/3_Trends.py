@@ -1,7 +1,7 @@
 import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
-from utils.data import load_ar_history
+from utils.data import invoice_aging_values, load_ar_history
 from utils.ui import YELLOW, chart_layout, page_header, section, footer
 
 page_header("AR Trends & Analytics", "Historical receivables trends and selectable AR snapshot comparisons.", badge="Historical")
@@ -19,11 +19,8 @@ date_options = [pd.Timestamp(d) for d in dates]
 
 def snapshot_values(value):
     snap = ar[ar["Snapshot Date"].dt.normalize().eq(pd.Timestamp(value))].copy()
-    balances = snap["Open Balance"]
-    current_mask = snap["Bucket"].str.casefold().eq("current")
-    total = float(balances.sum())
-    current = float(balances[current_mask].sum())
-    return {"Total AR":total, "Current":current, "Past Due":total-current}
+    metrics = invoice_aging_values(snap)
+    return {"Total AR": metrics["Total AR"], "Current": metrics["Current"], "Past Due": metrics["Past Due"]}
 
 history_rows = []
 for d in sorted(date_options):
@@ -31,7 +28,7 @@ for d in sorted(date_options):
 hist = pd.DataFrame(history_rows).sort_values("As of Date")
 hist["WoW Change"] = hist["Total AR"].diff()
 
-section("AR Balance Trend", "Total AR, Current, and Past Due across saved snapshots. No sales or pricing activity is included on this page.")
+section("AR Balance Trend", "Total AR plus invoice-only Current and Past Due balances across saved snapshots. Chargebacks are excluded from aging.")
 fig = go.Figure()
 for metric in ["Total AR", "Current", "Past Due"]:
     fig.add_trace(go.Scatter(x=hist["As of Date"], y=hist[metric], mode="lines+markers", name=metric))

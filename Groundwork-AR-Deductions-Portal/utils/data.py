@@ -7,6 +7,53 @@ from utils.paths import (
     REVENUE_SNAPSHOT_DIR,
 )
 
+AR_PAST_DUE_BUCKETS = {"1-14", "15-30", "31-60", "61-90", "91+", "90+"}
+AR_OVER_90_BUCKETS = {"91+", "90+"}
+AR_RECOVERY_REASONS = {"duplicate pmt", "overpayment", "pmt transfer", "on account payment (oap)"}
+
+
+def ar_transaction_masks(df):
+    """Return consistent invoice/chargeback masks for every AR dashboard view."""
+    index = df.index
+    transaction = df.get("Transaction Type", pd.Series("", index=index)).fillna("").astype(str).str.strip().str.casefold()
+    deduction = df.get(
+        "Deduction Type",
+        df.get("Transaction Reason", pd.Series("", index=index)),
+    ).fillna("").astype(str).str.strip().str.casefold()
+    memo = df.get("Memo", pd.Series("", index=index)).fillna("").astype(str).str.strip().str.casefold()
+
+    cb_marker = memo.str.contains(r"(?:^|\b)ar\s*cb\b", regex=True, na=False)
+    chargeback = transaction.str.contains(r"charge\s*back|chargeback", regex=True, na=False) | cb_marker
+    credit = transaction.str.contains("credit", regex=False, na=False) & ~chargeback
+    payment = transaction.str.contains("payment", regex=False, na=False) & ~chargeback
+    holdback = deduction.eq("holdback")
+    invoice = ~(chargeback | credit | payment | holdback)
+    recovery = chargeback & deduction.isin(AR_RECOVERY_REASONS)
+    return {
+        "chargeback": chargeback,
+        "credit": credit,
+        "payment": payment,
+        "holdback": holdback,
+        "invoice": invoice,
+        "recovery": recovery,
+    }
+
+
+def invoice_aging_values(df):
+    """Summarize invoice-only aging while retaining total AR as full exposure."""
+    if df is None or df.empty:
+        return {"Total AR": 0.0, "Invoice Total": 0.0, "Current": 0.0, "Past Due": 0.0, "Invoice 90+": 0.0}
+    balances = pd.to_numeric(df.get("Open Balance", 0), errors="coerce").fillna(0)
+    buckets = df.get("Bucket", pd.Series("Unknown", index=df.index)).fillna("Unknown").astype(str).str.strip()
+    invoice = ar_transaction_masks(df)["invoice"]
+    return {
+        "Total AR": float(balances.sum()),
+        "Invoice Total": float(balances[invoice].sum()),
+        "Current": float(balances[invoice & buckets.str.casefold().eq("current")].sum()),
+        "Past Due": float(balances[invoice & buckets.isin(AR_PAST_DUE_BUCKETS)].sum()),
+        "Invoice 90+": float(balances[invoice & buckets.isin(AR_OVER_90_BUCKETS)].sum()),
+    }
+
 def ar_snapshot_files():
     """Return saved AR snapshots as (snapshot_date, path), newest first."""
     snapshots = []
@@ -184,16 +231,14 @@ def ar_snapshot_table():
         try:
             frame = prep_ar(pd.read_csv(path))
             balances = pd.to_numeric(frame.get("Open Balance", 0), errors="coerce").fillna(0)
-            buckets = frame.get("Bucket", pd.Series("Unknown", index=frame.index)).fillna("Unknown").astype(str).str.strip()
-            current = float(balances[buckets.str.casefold().eq("current")].sum())
-            total = float(balances.sum())
+            metrics = invoice_aging_values(frame)
             rows.append({
                 "As of Date": stamp,
                 "Rows": len(frame),
                 "Customers": frame.loc[balances.ne(0), "Reporting Customer"].nunique(),
-                "Total AR": total,
-                "Current": current,
-                "Past Due": total - current,
+                "Total AR": metrics["Total AR"],
+                "Current": metrics["Current"],
+                "Past Due": metrics["Past Due"],
                 "File": path.name,
             })
         except Exception:
@@ -250,6 +295,12 @@ def prep_ar(df):
             df[col] = default
     df['Open Balance'] = pd.to_numeric(df['Open Balance'], errors='coerce').fillna(0)
     df['Snapshot Date'] = pd.to_datetime(df['Snapshot Date'], errors='coerce')
+    memo = df['Memo'].fillna('').astype(str).str.strip().str.casefold()
+    cb_marker = memo.str.contains(r'(?:^|\b)ar\s*cb\b', regex=True, na=False)
+    holdback = df['Deduction Type'].fillna('').astype(str).str.strip().str.casefold().eq('holdback')
+    df.loc[cb_marker & ~holdback, 'Transaction Type'] = 'Chargeback'
+    blank_reason = df['Deduction Type'].fillna('').astype(str).str.strip().eq('')
+    df.loc[cb_marker & blank_reason & ~holdback, 'Deduction Type'] = 'Other'
     return df
 
 

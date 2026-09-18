@@ -5,7 +5,7 @@ import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 
-from utils.data import load_ar_history
+from utils.data import ar_transaction_masks, invoice_aging_values, load_ar_history
 from utils.ui import (
     GREEN, GREEN_2, YELLOW, RED, chart_layout, footer, format_money,
     insight_box, kpi_row, page_header, section, style_money_table,
@@ -32,16 +32,18 @@ def _position_metrics(df: pd.DataFrame) -> dict:
     if df.empty:
         return {"total":0, "past_due":0, "current_pct":0, "dso":0, "customers":0, "over_90":0}
     balances = pd.to_numeric(df["Open Balance"], errors="coerce").fillna(0)
-    total = balances.sum()
-    current = balances[df["Bucket"].fillna("").eq("Current")].sum()
-    past_due = total - current
-    over_90 = balances[df["Bucket"].fillna("").isin(["91+", "90+"])].sum()
+    metrics = invoice_aging_values(df)
+    total = metrics["Total AR"]
+    current = metrics["Current"]
+    past_due = metrics["Past Due"]
+    over_90 = metrics["Invoice 90+"]
+    invoice_mask = ar_transaction_masks(df)["invoice"]
     age = pd.to_numeric(df.get("Age", 0), errors="coerce").fillna(0).clip(lower=0)
-    positive = balances.clip(lower=0)
+    positive = balances.where(invoice_mask, 0).clip(lower=0)
     weighted_age = float((age * positive).sum() / positive.sum()) if positive.sum() else 0
     return {
         "total": float(total), "past_due": float(past_due),
-        "current_pct": float(current / total) if total else 0,
+        "current_pct": float(current / metrics["Invoice Total"]) if metrics["Invoice Total"] else 0,
         "dso": weighted_age, "customers": int(df.loc[balances.ne(0), "Reporting Customer"].nunique()),
         "over_90": float(over_90),
     }
@@ -55,15 +57,14 @@ def _weekly_activity(df: pd.DataFrame, snapshot_date: pd.Timestamp | None) -> di
     work["Date"] = pd.to_datetime(work.get("Date"), errors="coerce")
     start = snapshot_date - pd.Timedelta(days=6)
     week = work[work["Date"].between(start, snapshot_date, inclusive="both")].copy()
-    transaction = _norm_text(week["Transaction Type"])
-    reason = _norm_text(week["Deduction Type"])
+    masks = ar_transaction_masks(week)
     gross = pd.to_numeric(week.get("Amount (Gross)", 0), errors="coerce").fillna(0).abs()
     open_balance = pd.to_numeric(week.get("Open Balance", 0), errors="coerce").fillna(0).abs()
 
-    invoice_mask = transaction.str.contains("invoice", regex=False) & ~reason.eq("holdback")
-    credit_mask = transaction.str.contains("credit", regex=False)
-    recovery_mask = transaction.str.contains("chargeback", regex=False) & reason.isin(["duplicate pmt", "overpayment", "on account payment (oap)"])
-    chargeback_mask = transaction.str.contains("chargeback", regex=False) & ~recovery_mask
+    invoice_mask = masks["invoice"]
+    credit_mask = masks["credit"]
+    recovery_mask = masks["recovery"]
+    chargeback_mask = masks["chargeback"] & ~recovery_mask
 
     result["sales"] = float(gross[invoice_mask].sum())
     result["credits"] = float(gross[credit_mask].sum())
@@ -145,9 +146,10 @@ insight_box("Monday Overview", insights)
 
 left, right = st.columns([1, 1.05], gap="large")
 with left:
-    section("Cash at Risk", "Open AR by aging bucket.")
+    section("Cash at Risk", "Invoice balances by aging bucket; chargebacks are excluded.")
     bucket_order = ["Current", "1-14", "15-30", "31-60", "61-90", "91+"]
-    aging = current.groupby("Bucket", dropna=False)["Open Balance"].sum().reindex(bucket_order).fillna(0)
+    invoice_current = current[ar_transaction_masks(current)["invoice"]]
+    aging = invoice_current.groupby("Bucket", dropna=False)["Open Balance"].sum().reindex(bucket_order).fillna(0)
     colors = [GREEN_2, "#6E8D7E", "#A7A58B", YELLOW, "#D98D55", RED]
     fig = go.Figure(go.Bar(
         x=aging.values, y=aging.index, orientation="h",
@@ -186,11 +188,12 @@ watch["Bucket"] = (
     .str.replace(r"^Current.*$", "Current", regex=True, case=False)
 )
 
-is_cb = watch["Transaction Type Normalized"].str.contains("chargeback", na=False)
-is_credit = watch["Transaction Type Normalized"].str.contains("credit", na=False)
-is_payment = watch["Transaction Type Normalized"].str.contains("payment", na=False)
-is_holdback = watch["Deduction Type Normalized"].eq("holdback")
-is_invoice = ~(is_cb | is_credit | is_payment) & ~is_holdback
+watch_masks = ar_transaction_masks(watch)
+is_cb = watch_masks["chargeback"]
+is_credit = watch_masks["credit"]
+is_payment = watch_masks["payment"]
+is_holdback = watch_masks["holdback"]
+is_invoice = watch_masks["invoice"]
 
 invoice_watch = watch[is_invoice].copy()
 invoice_watch["Current"] = np.where(invoice_watch["Bucket"].eq("Current"), invoice_watch["Open Balance"], 0)
