@@ -172,9 +172,25 @@ df = raw_df.copy()
 
 st.sidebar.markdown('<div class="gw-filter-heading">AR Filters</div>', unsafe_allow_html=True)
 
+
+def ar_filter_values(frame, col):
+    values = frame[col].fillna("Unknown").astype(str).str.strip()
+    if col != "Transaction Type":
+        return values
+    # Group display choices without changing the source transaction labels.
+    grouped = values.copy()
+    invoice = values.str.fullmatch(r"invoice(?:\s*[\[{]\s*ar\s+invoice\s*[\]}])?", case=False, na=False)
+    masks = ar_transaction_masks(frame)
+    grouped.loc[invoice] = "Invoice"
+    grouped.loc[masks["credit"]] = "Credit memos"
+    grouped.loc[masks["payment"]] = "Payments"
+    grouped.loc[masks["chargeback"] | values.str.contains(r"\bar[-\s]*cb\b", case=False, regex=True, na=False)] = "AR-CB"
+    return grouped
+
+
 filter_specs = [
     ("Customer", "Reporting Customer", "ar_customer"),
-    ("Transaction Type", "Transaction Type", "ar_transaction_type"),
+    ("Transaction Type", "Transaction Type", "ar_transaction_type_grouped"),
     ("Channel", channel_col, "ar_channel"),
     ("Sales Rep", "Sales Rep: Name", "ar_sales_rep"),
     ("Terms", "Terms: Name", "ar_terms"),
@@ -188,7 +204,7 @@ def reset_ar_filters():
 for label, col, key in filter_specs:
     if col not in df.columns:
         continue
-    values = sorted(v for v in raw_df[col].fillna("Unknown").astype(str).str.strip().unique() if v)
+    values = sorted(v for v in ar_filter_values(raw_df, col).unique() if v)
     choices = st.sidebar.multiselect(
         label,
         values,
@@ -196,12 +212,12 @@ for label, col, key in filter_specs:
         placeholder="All",
     )
     if choices:
-        normalized = df[col].fillna("Unknown").astype(str).str.strip()
+        normalized = ar_filter_values(df, col)
         df = df[normalized.isin(choices)]
         # Compare the same selected population in both snapshots.
         if not compare_raw_df.empty:
             if col in compare_raw_df.columns:
-                compare_values = compare_raw_df[col].fillna("Unknown").astype(str).str.strip()
+                compare_values = ar_filter_values(compare_raw_df, col)
                 compare_raw_df = compare_raw_df[compare_values.isin(choices)]
             else:
                 compare_raw_df = compare_raw_df.iloc[0:0]
