@@ -174,6 +174,7 @@ st.sidebar.markdown('<div class="gw-filter-heading">AR Filters</div>', unsafe_al
 
 filter_specs = [
     ("Customer", "Reporting Customer", "ar_customer"),
+    ("Transaction Type", "Transaction Type", "ar_transaction_type"),
     ("Channel", channel_col, "ar_channel"),
     ("Sales Rep", "Sales Rep: Name", "ar_sales_rep"),
     ("Terms", "Terms: Name", "ar_terms"),
@@ -197,6 +198,13 @@ for label, col, key in filter_specs:
     if choices:
         normalized = df[col].fillna("Unknown").astype(str).str.strip()
         df = df[normalized.isin(choices)]
+        # Compare the same selected population in both snapshots.
+        if not compare_raw_df.empty:
+            if col in compare_raw_df.columns:
+                compare_values = compare_raw_df[col].fillna("Unknown").astype(str).str.strip()
+                compare_raw_df = compare_raw_df[compare_values.isin(choices)]
+            else:
+                compare_raw_df = compare_raw_df.iloc[0:0]
 
 st.sidebar.button("↻  Clear Filters", key="clear_ar_filters", on_click=reset_ar_filters, use_container_width=True)
 
