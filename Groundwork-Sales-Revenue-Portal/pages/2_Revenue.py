@@ -498,20 +498,34 @@ metric_row([
 ])
 
 missing_weight_revenue = float(selected_df["Missing Weight Revenue"].sum())
+# Outlier detection: single-order periods or extreme revenue vs recent history are not comparable
+orders_in_period = int(current.get("Orders", 0))
+is_single_order = orders_in_period <= 1
+extreme_vs_prior = prior_revenue > 0 and current_revenue > prior_revenue * 5
+extreme_vs_avg = four_avg > 0 and current_revenue > four_avg * 5
+is_outlier = is_single_order or extreme_vs_prior or extreme_vs_avg or (current_lbs == 0 and current_revenue > 1_000_000)
+
 with st.container(border=True):
     st.markdown("#### Executive Story")
-    change = percent_change(current_revenue, prior_revenue)
-    if change is not None:
-        direction = "up" if change >= 0 else "down"
-        st.markdown(f"- Revenue is **{direction} {abs(change):.1f}%** versus the prior finance reporting period.")
-    if four_avg:
-        four_change = percent_change(current_revenue, four_avg)
-        if four_change is not None:
-            position = "above" if four_change >= 0 else "below"
-            st.markdown(f"- The selected week is **{abs(four_change):.1f}% {position}** the prior 4-week average of {format_money(four_avg, 0)}.")
-    st.markdown(f"- Wholesale weighted pricing is **{format_money(current_weighted, 2)}/lb** on **{fmt_number_1(current_lbs)} lbs** from Grocery + Foodservice rows with valid Size in Pounds.")
-    if missing_weight_revenue:
-        st.markdown(f"- **{format_money(missing_weight_revenue, 2)}** of Grocery + Foodservice revenue has no usable Size in Pounds / calculated pounds and is excluded from $/LB.")
+    if is_outlier:
+        st.markdown("- **Selected period is non-comparable** (single transaction, extreme revenue outlier, or no eligible coffee pounds). Percentage comparisons to prior periods are suppressed.")
+        if is_single_order:
+            st.markdown(f"- Period contains **{orders_in_period} order** totaling {format_money(current_revenue, 0)}.")
+        if current_lbs == 0 and current_revenue > 0:
+            st.markdown(f"- **No eligible coffee pounds.** The {format_money(current_revenue, 0)} revenue is excluded from $/LB (non-wholesale channel, missing Size in Pounds, or zero calculated weight).")
+    else:
+        change = percent_change(current_revenue, prior_revenue)
+        if change is not None:
+            direction = "up" if change >= 0 else "down"
+            st.markdown(f"- Revenue is **{direction} {abs(change):.1f}%** versus the prior finance reporting period.")
+        if four_avg:
+            four_change = percent_change(current_revenue, four_avg)
+            if four_change is not None:
+                position = "above" if four_change >= 0 else "below"
+                st.markdown(f"- The selected week is **{abs(four_change):.1f}% {position}** the prior 4-week average of {format_money(four_avg, 0)}.")
+        st.markdown(f"- Wholesale weighted pricing is **{format_money(current_weighted, 2)}/lb** on **{fmt_number_1(current_lbs)} lbs** from Grocery + Foodservice rows with valid Size in Pounds.")
+        if missing_weight_revenue:
+            st.markdown(f"- **{format_money(missing_weight_revenue, 2)}** of Grocery + Foodservice revenue has no usable Size in Pounds / calculated pounds and is excluded from $/LB.")
 
 # -----------------------------------------------------------------------------
 # Weekly Revenue + $/LB
@@ -522,7 +536,12 @@ section(
 )
 st.plotly_chart(weekly_chart(weekly), width="stretch")
 weekly_display = weekly[["Week Start", "Week End", "Revenue", "Eligible_Revenue", "Lbs", "Weighted $/LB", "Orders", "Customers", "Missing_Weight_Revenue"]].copy().sort_values("Week Start", ascending=False)
-weekly_display["Week"] = weekly_display.apply(lambda r: f"{r['Week Start']:%m/%d/%y} - {r['Week End']:%m/%d/%y}", axis=1)
+weekly_display["Week"] = weekly_display.apply(lambda r: f"{r['Week Start']:%m/%d/%y} – {r['Week End']:%m/%d/%y}", axis=1)
+# Round to avoid floating-point garbage in the table
+for col in ["Revenue", "Eligible_Revenue", "Lbs", "Weighted $/LB", "Missing_Weight_Revenue"]:
+    weekly_display[col] = pd.to_numeric(weekly_display[col], errors="coerce").round(2)
+weekly_display["Orders"] = pd.to_numeric(weekly_display["Orders"], errors="coerce").fillna(0).astype(int)
+weekly_display["Customers"] = pd.to_numeric(weekly_display["Customers"], errors="coerce").fillna(0).astype(int)
 weekly_display = weekly_display[["Week", "Revenue", "Eligible_Revenue", "Lbs", "Weighted $/LB", "Orders", "Customers", "Missing_Weight_Revenue"]]
 st.dataframe(
     weekly_display,
@@ -548,6 +567,10 @@ section(
 )
 st.plotly_chart(monthly_chart(monthly), width="stretch")
 monthly_display = monthly[["Month Label", "Revenue", "Orders", "Customers", "MoM %"]].copy().sort_values("Month Label")
+monthly_display["Revenue"] = pd.to_numeric(monthly_display["Revenue"], errors="coerce").round(2)
+monthly_display["Orders"] = pd.to_numeric(monthly_display["Orders"], errors="coerce").fillna(0).astype(int)
+monthly_display["Customers"] = pd.to_numeric(monthly_display["Customers"], errors="coerce").fillna(0).astype(int)
+monthly_display["MoM %"] = pd.to_numeric(monthly_display["MoM %"], errors="coerce").round(1)
 st.dataframe(
     monthly_display,
     use_container_width=True,

@@ -87,11 +87,11 @@ li[role="option"] *,div[role="option"] *{{color:#22251F!important;-webkit-text-f
 .gw-head-status strong{{color:var(--gw-charcoal);font-size:.92rem}} .gw-head-status small{{display:block;color:#50564E;font-size:.82rem;margin-top:.18rem}}
 .gw-section-title{{font-size:1.72rem;line-height:1.2;font-weight:880;margin:1.55rem 0 .18rem;color:var(--gw-charcoal)}}
 .gw-section-caption{{color:#596057;font-size:1rem;line-height:1.4;margin-bottom:.78rem}}
-.gw-card{{background:#fff;border:1px solid var(--gw-border);border-radius:14px;box-shadow:0 7px 22px rgba(37,46,39,.05);padding:1rem 1.05rem}}
+.gw-card{{background:#fff;border:1px solid var(--gw-border);border-radius:14px;box-shadow:0 7px 22px rgba(37,46,39,.05);padding:1rem 1.05rem;min-width:0}}
 .gw-kpi{{min-height:134px;position:relative;overflow:hidden}} .gw-kpi:before{{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--gw-yellow)}}
-.gw-kpi-label{{color:#5B6259;font-size:.82rem;text-transform:uppercase;letter-spacing:.075em;font-weight:820}}
-.gw-kpi-value{{font-size:2rem;line-height:1.12;font-weight:900;margin-top:.5rem;color:var(--gw-charcoal);white-space:nowrap}}
-.gw-kpi-delta{{font-size:.88rem;font-weight:760;margin-top:.58rem}} .gw-positive{{color:#14823B}} .gw-negative{{color:var(--gw-red)}} .gw-neutral{{color:var(--gw-muted)}}
+.gw-kpi-label{{color:#5B6259;font-size:.72rem;text-transform:uppercase;letter-spacing:.05em;font-weight:820;line-height:1.25;word-break:break-word}}
+.gw-kpi-value{{font-size:1.45rem;line-height:1.15;font-weight:900;margin-top:.45rem;color:var(--gw-charcoal);white-space:normal;word-break:break-word;overflow-wrap:anywhere}}
+.gw-kpi-delta{{font-size:.8rem;font-weight:760;margin-top:.45rem}} .gw-positive{{color:#14823B}} .gw-negative{{color:var(--gw-red)}} .gw-neutral{{color:var(--gw-muted)}}
 .gw-insight{{background:#FEFBF3;border:1px solid #E6D8AC;border-left:5px solid var(--gw-yellow);border-radius:14px;padding:1rem 1.15rem}}
 .gw-insight-title{{font-size:1.25rem;font-weight:880;color:var(--gw-charcoal);margin-bottom:.45rem}} .gw-insight p{{font-size:1rem;line-height:1.45;margin:.28rem 0;color:#383D37!important}}
 [data-testid="stDataFrame"],[data-testid="stTable"]{{background:#fff!important;border:1px solid var(--gw-border)!important;border-radius:14px;overflow:hidden;box-shadow:0 7px 22px rgba(37,46,39,.04)}}
