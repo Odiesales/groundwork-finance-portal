@@ -50,12 +50,15 @@ else:
 
     # Use the reconciled pounds methodology only. Never use the legacy Lbs column
     # as package weight because it may already contain calculated pounds.
-    required_pricing = {"Size in Pounds", "Sum of Quantity", "Sales Channel"}
-    if required_pricing.issubset(history.columns):
-        size_lbs = pd.to_numeric(history["Size in Pounds"], errors="coerce").fillna(0).abs()
-        qty = pd.to_numeric(history["Sum of Quantity"], errors="coerce").fillna(0).abs()
-        if "Sum of # of Units" in history.columns:
-            units = pd.to_numeric(history["Sum of # of Units"], errors="coerce").fillna(1).abs()
+    # Accept Size in Pounds or Package Lbs (cleaner alias).
+    size_col = next((c for c in ["Size in Pounds", "Package Lbs"] if c in history.columns), None)
+    qty_col = next((c for c in ["Sum of Quantity", "Quantity"] if c in history.columns), None)
+    if size_col and qty_col and "Sales Channel" in history.columns:
+        size_lbs = pd.to_numeric(history[size_col], errors="coerce").fillna(0).abs()
+        qty = pd.to_numeric(history[qty_col], errors="coerce").fillna(0).abs()
+        units_col = next((c for c in ["Sum of # of Units", "# of Units", "Units Sold", "Units"] if c in history.columns), None)
+        if units_col:
+            units = pd.to_numeric(history[units_col], errors="coerce").fillna(1).abs()
             units = units.where(units > 0, 1.0)
         else:
             units = pd.Series(1.0, index=history.index)
@@ -78,10 +81,11 @@ rev_file = st.file_uploader("Upload Revenue export", type=["xlsx", "xls", "csv"]
 if rev_file:
     try:
         rev_df = clean_uploaded_revenue_report(rev_file)
-        if "Size in Pounds" not in rev_df.columns:
+        if "Size in Pounds" not in rev_df.columns and "Package Lbs" not in rev_df.columns:
             raise ValueError(
-                "This Revenue export does not contain 'Size in Pounds'. Use the full Revenue Analysis export "
-                "with Size in Pounds so the portal can calculate wholesale $/LB accurately."
+                "This Revenue export does not contain usable package weight "
+                "('Size in Pounds' or 'Package Lbs'). Use the full Revenue Analysis export "
+                "with size/weight information so the portal can calculate wholesale $/LB accurately."
             )
         upload_weeks = revenue_week_values(rev_df)
         existing_weeks = set(weeks)

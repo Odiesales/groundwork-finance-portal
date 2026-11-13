@@ -185,14 +185,16 @@ def normalize_revenue(source: pd.DataFrame) -> tuple[pd.DataFrame, bool]:
 
     # Do not fall back to a pre-calculated Lbs field. That can double-count package
     # weights and was the source of the implausible $0.19/LB result.
-    has_size_in_pounds = "Size in Pounds" in frame.columns
-    if not has_size_in_pounds:
+    # Prefer explicit Size in Pounds; fall back to Package Lbs (cleaner output).
+    size_col = first_column(frame, ["Size in Pounds", "Package Lbs"])
+    if size_col is None:
         raise ValueError(
-            "Revenue history is missing 'Size in Pounds'. Re-upload the full Revenue Analysis export "
-            "that contains Size in Pounds before using Revenue $/LB. The portal will not use the legacy "
-            "Lbs fallback because it can materially overstate pounds."
+            "Revenue history is missing 'Size in Pounds' (or 'Package Lbs'). "
+            "Re-upload the full Revenue Analysis export that contains size/weight information "
+            "so the portal can calculate wholesale $/LB accurately."
         )
-    size_lbs = pd.to_numeric(frame["Size in Pounds"], errors="coerce").fillna(0.0).abs()
+    has_size_in_pounds = True
+    size_lbs = pd.to_numeric(frame[size_col], errors="coerce").fillna(0.0).abs()
 
     channel_text = frame["Sales Channel Calc"].str.lower()
     is_grocery = channel_text.str.contains("grocery", na=False)

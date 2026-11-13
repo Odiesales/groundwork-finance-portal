@@ -370,6 +370,8 @@ def clean_uploaded_revenue_report(uploaded_file):
     out["Unit"] = df[unit_col].fillna("").astype(str) if unit_col else ""
     out["Unit Multiplier"] = fallback_multiplier.astype(float)
     out["Package Lbs"] = package_lbs.astype(float)
+    # Alias used by the Revenue dashboard for wholesale $/LB (per-package weight, not total Lbs).
+    out["Size in Pounds"] = out["Package Lbs"]
     out["Weight Source"] = "Fallback parser"
     out.loc[use_authoritative, "Weight Source"] = "Sum of # of Units x weight by lbs"
     out["Multiplier Source"] = "Not used - authoritative units"
