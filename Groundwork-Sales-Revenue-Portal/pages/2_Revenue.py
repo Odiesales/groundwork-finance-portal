@@ -537,25 +537,19 @@ section(
 st.plotly_chart(weekly_chart(weekly), width="stretch")
 weekly_display = weekly[["Week Start", "Week End", "Revenue", "Eligible_Revenue", "Lbs", "Weighted $/LB", "Orders", "Customers", "Missing_Weight_Revenue"]].copy().sort_values("Week Start", ascending=False)
 weekly_display["Week"] = weekly_display.apply(lambda r: f"{r['Week Start']:%m/%d/%y} – {r['Week End']:%m/%d/%y}", axis=1)
-# Round to avoid floating-point garbage in the table
-for col in ["Revenue", "Eligible_Revenue", "Lbs", "Weighted $/LB", "Missing_Weight_Revenue"]:
-    weekly_display[col] = pd.to_numeric(weekly_display[col], errors="coerce").round(2)
-weekly_display["Orders"] = pd.to_numeric(weekly_display["Orders"], errors="coerce").fillna(0).astype(int)
-weekly_display["Customers"] = pd.to_numeric(weekly_display["Customers"], errors="coerce").fillna(0).astype(int)
-weekly_display = weekly_display[["Week", "Revenue", "Eligible_Revenue", "Lbs", "Weighted $/LB", "Orders", "Customers", "Missing_Weight_Revenue"]]
+# Pre-format for reliable display (Streamlit NumberColumn format is unreliable)
+weekly_display["Total Revenue"] = weekly_display["Revenue"].apply(lambda x: format_money(x, 2))
+weekly_display["Revenue Used in $/LB"] = weekly_display["Eligible_Revenue"].apply(lambda x: format_money(x, 2))
+weekly_display["Eligible Lbs"] = weekly_display["Lbs"].apply(lambda x: f"{float(x):,.1f}" if pd.notna(x) else "0.0")
+weekly_display["Weighted $/LB"] = weekly_display["Weighted $/LB"].apply(lambda x: format_money(x, 2))
+weekly_display["Orders"] = weekly_display["Orders"].apply(lambda x: f"{int(x):,}" if pd.notna(x) else "0")
+weekly_display["Customers"] = weekly_display["Customers"].apply(lambda x: f"{int(x):,}" if pd.notna(x) else "0")
+weekly_display["Missing Weight Revenue"] = weekly_display["Missing_Weight_Revenue"].apply(lambda x: format_money(x, 2))
+weekly_display = weekly_display[["Week", "Total Revenue", "Revenue Used in $/LB", "Eligible Lbs", "Weighted $/LB", "Orders", "Customers", "Missing Weight Revenue"]]
 st.dataframe(
     weekly_display,
     use_container_width=True,
     hide_index=True,
-    column_config={
-        "Revenue": st.column_config.NumberColumn("Total Revenue", format="$%,.2f"),
-        "Eligible_Revenue": st.column_config.NumberColumn("Revenue Used in $/LB", format="$%,.2f"),
-        "Lbs": st.column_config.NumberColumn("Eligible Lbs", format="%,.1f"),
-        "Weighted $/LB": st.column_config.NumberColumn("Weighted $/LB", format="$%.2f"),
-        "Orders": st.column_config.NumberColumn("Orders", format="%,d"),
-        "Customers": st.column_config.NumberColumn("Customers", format="%,d"),
-        "Missing_Weight_Revenue": st.column_config.NumberColumn("Missing Weight Revenue", format="$%,.2f"),
-    },
 )
 
 # -----------------------------------------------------------------------------
@@ -567,21 +561,15 @@ section(
 )
 st.plotly_chart(monthly_chart(monthly), width="stretch")
 monthly_display = monthly[["Month Label", "Revenue", "Orders", "Customers", "MoM %"]].copy().sort_values("Month Label")
-monthly_display["Revenue"] = pd.to_numeric(monthly_display["Revenue"], errors="coerce").round(2)
-monthly_display["Orders"] = pd.to_numeric(monthly_display["Orders"], errors="coerce").fillna(0).astype(int)
-monthly_display["Customers"] = pd.to_numeric(monthly_display["Customers"], errors="coerce").fillna(0).astype(int)
-monthly_display["MoM %"] = pd.to_numeric(monthly_display["MoM %"], errors="coerce").round(1)
+monthly_display["Revenue"] = monthly_display["Revenue"].apply(lambda x: format_money(x, 2))
+monthly_display["Orders"] = monthly_display["Orders"].apply(lambda x: f"{int(x):,}" if pd.notna(x) else "0")
+monthly_display["Customers"] = monthly_display["Customers"].apply(lambda x: f"{int(x):,}" if pd.notna(x) else "0")
+monthly_display["MoM %"] = monthly_display["MoM %"].apply(lambda x: f"{float(x):+.1f}%" if pd.notna(x) else "—")
 st.dataframe(
     monthly_display,
     use_container_width=True,
     hide_index=True,
-    column_config={
-        "Month Label": "Month",
-        "Revenue": st.column_config.NumberColumn("Revenue", format="$%,.2f"),
-        "Orders": st.column_config.NumberColumn("Orders", format="%,d"),
-        "Customers": st.column_config.NumberColumn("Customers", format="%,d"),
-        "MoM %": st.column_config.NumberColumn("MoM %", format="%,.1f%%"),
-    },
+    column_config={"Month Label": "Month"},
 )
 
 # -----------------------------------------------------------------------------
